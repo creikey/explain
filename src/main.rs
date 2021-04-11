@@ -52,6 +52,7 @@ pub fn main() {
 
     // gl stuff
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
+    let mut drawing_wireframe = false;
     unsafe {
         gl::Viewport(0, 0, 800, 600);
     }
@@ -80,6 +81,20 @@ pub fn main() {
                     if item_currently_creating.is_some() {
                         items.push(item_currently_creating.unwrap());
                         item_currently_creating = None;
+                    }
+                }
+                #[cfg(debug_assertions)]
+                Event::KeyDown {
+                    keycode: Some(Keycode::Z),
+                    ..
+                } => {
+                    drawing_wireframe = !drawing_wireframe;
+                    unsafe {
+                        if drawing_wireframe {
+                            gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
+                        } else {
+                            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
+                        }
                     }
                 }
                 Event::Window { win_event, .. } => match win_event {
