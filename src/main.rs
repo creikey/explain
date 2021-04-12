@@ -3,8 +3,8 @@ extern crate nalgebra as na;
 extern crate sdl2;
 
 pub mod gl_shaders;
-pub mod line;
 pub mod gl_vertices;
+pub mod line;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -76,12 +76,25 @@ pub fn main() {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
+
+                // creation and deletion
                 Event::MouseButtonDown {
                     mouse_btn: MouseButton::Left,
                     ..
                 } => {
                     item_currently_creating = Some(Box::new(Line::new()));
                 }
+                Event::MouseButtonUp {
+                    mouse_btn: MouseButton::Left,
+                    ..
+                } => {
+                    if item_currently_creating.is_some() {
+                        items.push(item_currently_creating.unwrap());
+                        item_currently_creating = None;
+                    }
+                }
+
+                // zooming
                 Event::MouseWheel { y, .. } => {
                     let scale_delta = 1.0 + (y as f32) * 0.04;
                     let scale_mat = na::Matrix4::new_nonuniform_scaling_wrt_point(
@@ -95,15 +108,8 @@ pub fn main() {
                     ) * camera_inv;*/
                     camera_inv = camera.pseudo_inverse(0.0001).unwrap();
                 }
-                Event::MouseButtonUp {
-                    mouse_btn: MouseButton::Left,
-                    ..
-                } => {
-                    if item_currently_creating.is_some() {
-                        items.push(item_currently_creating.unwrap());
-                        item_currently_creating = None;
-                    }
-                }
+                
+                // panning
                 Event::MouseMotion { xrel, yrel, .. } => {
                     if middle_down {
                         let movement = na::Vector3::new(xrel as f32, yrel as f32, 0.0);
@@ -111,6 +117,8 @@ pub fn main() {
                         camera_inv = camera.pseudo_inverse(0.0001).unwrap();
                     }
                 }
+
+                // debug wireframe mode
                 #[cfg(debug_assertions)]
                 Event::KeyDown {
                     keycode: Some(Keycode::Z),
@@ -125,6 +133,8 @@ pub fn main() {
                         }
                     }
                 }
+
+                // resize the gl canvas with the window
                 Event::Window { win_event, .. } => match win_event {
                     sdl2::event::WindowEvent::Resized(x, y) => unsafe {
                         gl::Viewport(0, 0, x, y);
@@ -135,6 +145,8 @@ pub fn main() {
                 },
                 _ => {}
             }
+
+            // pass event on through trait
             if let Some(item) = &mut item_currently_creating {
                 item.process_event(&event, &camera_inv);
             }

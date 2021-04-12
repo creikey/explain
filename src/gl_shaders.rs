@@ -1,6 +1,6 @@
 use gl;
 use std;
-use std::ffi::{CStr, CString};
+use std::ffi::{CString};
 use nalgebra as na;
 
 // based off of https://github.com/Nercury/rust-and-opengl-lessons/blob/master/lesson-03/src/render_gl.rs

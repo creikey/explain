@@ -2,11 +2,8 @@ extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
 use crate::Drawable;
-use na::{Vector2, Vector3};
+use na::{Vector2};
 use sdl2::event::Event;
-use sdl2::rect::Point;
-use std::ffi::CString;
-use std::time::{Duration, Instant};
 
 type P = na::Point3<f32>;
 type V2 = Vector2<f32>;
