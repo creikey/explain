@@ -4,14 +4,11 @@ extern crate sdl2;
 
 pub mod gl_shaders;
 pub mod line;
+pub mod gl_vertices;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::rect::Point;
-use sdl2::render::Canvas;
 use sdl2::video::GLProfile;
-use sdl2::video::Window;
 use std::time::Duration;
 
 use line::Line;
@@ -37,7 +34,7 @@ pub fn main() {
         .build()
         .unwrap();
 
-    let ctx = window.gl_create_context().unwrap();
+    let _ctx = window.gl_create_context().unwrap();
     gl::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const _);
 
     debug_assert_eq!(gl_attr.context_profile(), GLProfile::Core);
@@ -48,7 +45,6 @@ pub fn main() {
     // available
     let mut items: Vec<Box<dyn Drawable>> = Vec::new();
     let mut item_currently_creating: Option<Box<dyn Drawable>> = None;
-    let mut dragging = false;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
@@ -88,7 +84,6 @@ pub fn main() {
                 }
                 Event::MouseWheel { y, .. } => {
                     let scale_delta = 1.0 + (y as f32) * 0.04;
-                    let inv_scale_delta = 1.0 + (y as f32) * -0.04;
                     let scale_mat = na::Matrix4::new_nonuniform_scaling_wrt_point(
                         &na::Vector3::new(scale_delta, scale_delta, 0.0),
                         &mouse_pos,
