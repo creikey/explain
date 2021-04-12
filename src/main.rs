@@ -68,7 +68,10 @@ pub fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        let middle_down = event_pump.mouse_state().middle();
+        let ms = event_pump.mouse_state();
+        let middle_down = ms.middle();
+        let mouse_pos = na::Point3::new(ms.x() as f32, ms.y() as f32, 0.0);
+        drop(ms);
         for event in event_pump.poll_iter() {
             if let Some(item) = &mut item_currently_creating {
                 item.process_event(&event, &camera_inv);
@@ -86,6 +89,20 @@ pub fn main() {
                 } => {
                     item_currently_creating = Some(Box::new(Line::new()));
                 }
+                Event::MouseWheel { y, .. } => {
+                    let scale_delta = 1.0 + (y as f32) * 0.04;
+                    let inv_scale_delta = 1.0 + (y as f32) * -0.04;
+                    let scale_mat = na::Matrix4::new_nonuniform_scaling_wrt_point(
+                        &na::Vector3::new(scale_delta, scale_delta, 0.0),
+                        &mouse_pos,
+                    );
+                    camera = scale_mat * camera;
+                    /*camera_inv = na::Matrix4::new_nonuniform_scaling_wrt_point(
+                        &na::Vector3::new(inv_scale_delta, inv_scale_delta, 0.0),
+                        &mouse_pos,
+                    ) * camera_inv;*/
+                    camera_inv = camera.pseudo_inverse(0.0001).unwrap();
+                }
                 Event::MouseButtonUp {
                     mouse_btn: MouseButton::Left,
                     ..
@@ -99,7 +116,7 @@ pub fn main() {
                     if middle_down {
                         let movement = na::Vector3::new(xrel as f32, yrel as f32, 0.0);
                         camera = camera.append_translation(&movement);
-                        camera_inv = camera_inv.append_translation(&-movement);
+                        camera_inv = camera.pseudo_inverse(0.0001).unwrap();
                     }
                 }
                 #[cfg(debug_assertions)]

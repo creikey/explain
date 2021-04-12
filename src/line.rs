@@ -7,8 +7,6 @@ use sdl2::rect::Point;
 use std::ffi::CString;
 use std::time::{Duration, Instant};
 
-// NOTE the float datatype of this vector _must_ match the float datatype used to hand the vector
-// data to shaders
 type V = Vector3<f32>;
 type P = na::Point3<f32>;
 type V2 = Vector2<f32>;
