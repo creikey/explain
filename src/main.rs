@@ -68,18 +68,23 @@ pub fn main() {
             if let Some(item) = &mut item_currently_creating {
                 item.process_event(&event);
             }
+            use sdl2::mouse::MouseButton;
             match event {
                 Event::Quit { .. }
                 | Event::KeyDown {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
-                // TODO check the mouse_btn to see if it's left click, and check the tool that is
-                // active will create stuff (tool might be trait too)
-                Event::MouseButtonDown { mouse_btn, .. } => {
+                Event::MouseButtonDown {
+                    mouse_btn: MouseButton::Left,
+                    ..
+                } => {
                     item_currently_creating = Some(Box::new(Line::new()));
                 }
-                Event::MouseButtonUp { mouse_btn, .. } => {
+                Event::MouseButtonUp {
+                    mouse_btn: MouseButton::Left,
+                    ..
+                } => {
                     if item_currently_creating.is_some() {
                         items.push(item_currently_creating.unwrap());
                         item_currently_creating = None;
