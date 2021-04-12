@@ -11,8 +11,8 @@ uniform float width;
 
 void main()
 {
-    vec3 newPosition = Position;
+    vec3 newPosition = (camera * vec4(Position, 1.0)).xyz;
     toEdge = normal * width;
     newPosition.xy += toEdge;
-    gl_Position = projection * camera * vec4(newPosition, 1.0);
+    gl_Position = projection * vec4(newPosition, 1.0);
 }

@@ -73,9 +73,6 @@ pub fn main() {
         let mouse_pos = na::Point3::new(ms.x() as f32, ms.y() as f32, 0.0);
         drop(ms);
         for event in event_pump.poll_iter() {
-            if let Some(item) = &mut item_currently_creating {
-                item.process_event(&event, &camera_inv);
-            }
             use sdl2::mouse::MouseButton;
             match event {
                 Event::Quit { .. }
@@ -142,6 +139,9 @@ pub fn main() {
                     _ => {}
                 },
                 _ => {}
+            }
+            if let Some(item) = &mut item_currently_creating {
+                item.process_event(&event, &camera_inv);
             }
         }
 

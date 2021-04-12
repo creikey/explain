@@ -84,7 +84,7 @@ impl Drawable for Line {
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
         self.shader_program.write_mat4("camera", camera);
-        self.shader_program.write_float("width", 3.0);
+        self.shader_program.write_float("width", 2.0);
         unsafe {
             self.gl_vertices.activate();
             gl::DrawElements(
