@@ -1,6 +1,7 @@
 use gl;
 use std;
 use std::ffi::{CStr, CString};
+use nalgebra as na;
 
 // based off of https://github.com/Nercury/rust-and-opengl-lessons/blob/master/lesson-03/src/render_gl.rs
 
@@ -9,6 +10,34 @@ pub struct ShaderProgram {
 }
 
 impl ShaderProgram {
+    fn get_location(&self, name: &str) -> i32 {
+        unsafe {
+            gl::GetUniformLocation(
+                self.id(),
+                CString::new(name).unwrap().as_bytes_with_nul().as_ptr() as *const i8,
+            )
+        }
+    }
+    // read only reference might be the wrong thing in this case, as it is modifying GPU data that
+    // the shader "owns"
+    pub fn write_mat4(&self, name: &str, mat: &na::Matrix4<f32>) {
+        unsafe {
+            gl::UniformMatrix4fv(
+                self.get_location(name),
+                1,
+                gl::FALSE,
+                mat.as_slice().as_ptr(),
+            );
+        }
+    }
+    pub fn write_float(&self, name: &str, f: f32) {
+       unsafe {
+            gl::Uniform1f(
+                self.get_location(name),
+                f,
+            );
+        } 
+    }
     pub fn from_shaders(shaders: &[Shader]) -> Result<ShaderProgram, String> {
         let program_id = unsafe { gl::CreateProgram() };
 
@@ -82,7 +111,7 @@ pub enum ShaderType {
 
 impl ShaderType {
     fn to_gl_type(self) -> gl::types::GLuint {
-       match self {
+        match self {
             ShaderType::Vertex => gl::VERTEX_SHADER,
             ShaderType::Fragment => gl::FRAGMENT_SHADER,
         }

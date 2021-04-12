@@ -55,6 +55,8 @@ pub fn main() {
     let mut drawing_wireframe = false;
     unsafe {
         gl::Viewport(0, 0, 800, 600);
+        gl::Enable(gl::BLEND);
+        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
     'running: loop {
         unsafe {
