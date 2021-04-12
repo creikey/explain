@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 // NOTE the float datatype of this vector _must_ match the float datatype used to hand the vector
 // data to shaders
 type V = Vector3<f32>;
+type P = na::Point3<f32>;
 type V2 = Vector2<f32>;
 
 fn vec_size<T>(v: &Vec<T>) -> gl::types::GLsizeiptr {
@@ -20,7 +21,7 @@ struct VertexData {
     vao: gl::types::GLuint,
     vbo: gl::types::GLuint,
     ebo: gl::types::GLuint,
-    data: Vec<(V, V2)>,
+    data: Vec<(P, V2)>,
     indices: Vec<u32>, // NOTE this u32 must be the same size as GL_UNSIGNED_INT
 }
 
@@ -57,7 +58,7 @@ impl VertexData {
 pub struct Line {
     shader_program: ShaderProgram,
     gl_vertices: VertexData,
-    last_point: Option<V>,
+    last_point: Option<P>,
 }
 
 impl Line {
@@ -77,14 +78,15 @@ impl Line {
 }
 
 impl Drawable for Line {
-    fn draw(&self, projection: &na::Matrix4<f32>) {
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix4<f32>) {
         if self.gl_vertices.data.len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
         // draw triangle
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
-        self.shader_program.write_float("width", 2.0);
+        self.shader_program.write_mat4("camera", camera);
+        self.shader_program.write_float("width", 3.0);
         unsafe {
             self.gl_vertices.activate();
             gl::DrawElements(
@@ -96,10 +98,10 @@ impl Drawable for Line {
             self.gl_vertices.deactivate();
         }
     }
-    fn process_event(&mut self, e: &Event) {
+    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>) {
         // TODO when line is committed move out of DYNAMIC_DRAW memory
         if let Event::MouseMotion { x, y, .. } = *e {
-            let new_point = V::new(x as f32, y as f32, 0.0);
+            let new_point = (camera_inv).transform_point(&na::Point3::new(x as f32, y as f32, 0.0));
 
             if self.last_point.is_none() {
                 self.last_point = Some(new_point);

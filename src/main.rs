@@ -17,8 +17,8 @@ use std::time::Duration;
 use line::Line;
 
 pub trait Drawable {
-    fn draw(&self, projection: &na::Matrix4<f32>);
-    fn process_event(&mut self, e: &Event);
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix4<f32>);
+    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>);
 }
 
 pub fn main() {
@@ -43,15 +43,19 @@ pub fn main() {
     debug_assert_eq!(gl_attr.context_profile(), GLProfile::Core);
     debug_assert_eq!(gl_attr.context_version(), (3, 3));
 
+    // ui state
     // array of items that dynamically expands as user creates more items with the various tools
     // available
     let mut items: Vec<Box<dyn Drawable>> = Vec::new();
     let mut item_currently_creating: Option<Box<dyn Drawable>> = None;
+    let mut dragging = false;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
     // gl stuff
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
+    let mut camera = nalgebra::Matrix4::new_translation(&na::Vector3::new(0.0, 0.0, 0.0));
+    let mut camera_inv = camera;
     let mut drawing_wireframe = false;
     unsafe {
         gl::Viewport(0, 0, 800, 600);
@@ -64,9 +68,10 @@ pub fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
+        let middle_down = event_pump.mouse_state().middle();
         for event in event_pump.poll_iter() {
             if let Some(item) = &mut item_currently_creating {
-                item.process_event(&event);
+                item.process_event(&event, &camera_inv);
             }
             use sdl2::mouse::MouseButton;
             match event {
@@ -88,6 +93,13 @@ pub fn main() {
                     if item_currently_creating.is_some() {
                         items.push(item_currently_creating.unwrap());
                         item_currently_creating = None;
+                    }
+                }
+                Event::MouseMotion { xrel, yrel, .. } => {
+                    if middle_down {
+                        let movement = na::Vector3::new(xrel as f32, yrel as f32, 0.0);
+                        camera = camera.append_translation(&movement);
+                        camera_inv = camera_inv.append_translation(&-movement);
                     }
                 }
                 #[cfg(debug_assertions)]
@@ -118,10 +130,10 @@ pub fn main() {
 
         let mat = projection.as_matrix();
         for i in items.iter() {
-            i.draw(mat);
+            i.draw(mat, &camera);
         }
         if let Some(item) = &item_currently_creating {
-            item.draw(mat);
+            item.draw(mat, &camera);
         }
 
         window.gl_swap_window();

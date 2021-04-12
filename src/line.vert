@@ -6,6 +6,7 @@ layout (location = 1) in vec2 normal;
 out vec2 toEdge;
 
 uniform mat4 projection;
+uniform mat4 camera;
 uniform float width;
 
 void main()
@@ -13,5 +14,5 @@ void main()
     vec3 newPosition = Position;
     toEdge = normal * width;
     newPosition.xy += toEdge;
-    gl_Position = projection * vec4(newPosition, 1.0);
+    gl_Position = projection * camera * vec4(newPosition, 1.0);
 }
