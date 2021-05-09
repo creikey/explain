@@ -109,10 +109,10 @@ impl<T> VertexData<T> {
     /// * `last_update` - If this is the last vertex update, will be stored in static instead of
     /// dynamic memory for greater efficiency
     pub fn append(&mut self, new_data: &mut Vec<T>, new_indices: &mut Vec<u32>, last_update: bool) {
-        self.data.append(new_data);
         for elem in new_indices.iter_mut() {
             *elem += self.data.len() as u32;
         }
+        self.data.append(new_data);
         self.indices.append(new_indices);
 
         let storage_type = if last_update {
