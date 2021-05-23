@@ -38,14 +38,14 @@ impl Drawable for Line {
         self.shader_program.write_float("width", 2.0);
         self.gl_vertices.draw();
     }
-    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>) {
+    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>) -> bool {
         // TODO when line is committed move out of DYNAMIC_DRAW memory
         if let Event::MouseMotion { x, y, .. } = *e {
             let new_point = (camera_inv).transform_point(&na::Point3::new(x as f32, y as f32, 0.0));
 
             if self.last_point.is_none() {
                 self.last_point = Some(new_point);
-                return;
+                return true;
             }
             let last_point = self.last_point.unwrap();
 
@@ -85,6 +85,8 @@ impl Drawable for Line {
             );
 
             self.last_point = Some(new_point);
+            return true;
         }
+        false
     }
 }
