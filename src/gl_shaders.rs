@@ -5,6 +5,15 @@ use nalgebra as na;
 
 // based off of https://github.com/Nercury/rust-and-opengl-lessons/blob/master/lesson-03/src/render_gl.rs
 
+macro_rules! shader {
+    ($vert_program:literal , $frag_program:literal) => {
+        ShaderProgram::from_shaders(&[
+            Shader::from_source(include_str!($vert_program), ShaderType::Vertex).unwrap(),
+            Shader::from_source(include_str!($frag_program), ShaderType::Fragment).unwrap(),
+        ])
+        .unwrap()
+    };
+}
 pub struct ShaderProgram {
     id: gl::types::GLuint,
 }

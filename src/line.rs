@@ -16,11 +16,7 @@ pub struct Line {
 
 impl Line {
     pub fn new() -> Line {
-        let shader_program = ShaderProgram::from_shaders(&[
-            Shader::from_source(include_str!("line.vert"), ShaderType::Vertex).unwrap(),
-            Shader::from_source(include_str!("line.frag"), ShaderType::Fragment).unwrap(),
-        ])
-        .unwrap();
+        let shader_program = shader!("line.vert", "line.frag");
 
         use vertex_attribs::*;
         Line {

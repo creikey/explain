@@ -2,6 +2,7 @@ extern crate gl;
 extern crate nalgebra as na;
 extern crate sdl2;
 
+#[macro_use]
 pub mod gl_shaders;
 pub mod gl_vertices;
 mod line;

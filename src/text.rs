@@ -23,17 +23,12 @@ pub struct Text {
 
 impl Text {
     pub fn new() -> Self {
-        let shader_program = ShaderProgram::from_shaders(&[
-            Shader::from_source(include_str!("text.vert"), ShaderType::Vertex).unwrap(),
-            Shader::from_source(include_str!("text.frag"), ShaderType::Fragment).unwrap(),
-        ])
-        .unwrap();
+        let shader_program = shader!("text.vert", "text.frag");
 
         use vertex_attribs::*;
         let mut gl_vertices = VertexData::new(vec![POINT3_F32, POINT2_F32]);
         use image::DynamicImage;
         let img = image::open("src/arial-font.png").unwrap();
-        //println!("Img: {}", &format!("{:?}", img)[0..10]);
         let mut texture = 0;
         let mut size = (0, 0);
         unsafe {
@@ -130,7 +125,8 @@ impl Drawable for Text {
                 let origin_y = rect.get("originY").unwrap().as_i64().unwrap();
                 let origin_x = -rect.get("originX").unwrap().as_i64().unwrap() as f32;
 
-                let vertical_offset = self.character_map.get("size").unwrap().as_i64().unwrap() - origin_y;
+                let vertical_offset =
+                    self.character_map.get("size").unwrap().as_i64().unwrap() - origin_y;
                 println!("{}", vertical_offset);
                 self.gl_vertices.append(
                     &mut vec![
