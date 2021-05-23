@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Launch",
+      "args": [],
+      "program": "${workspaceFolder}/target/debug/explain",
+      "windows": {
+        "program": "${workspaceFolder}/target/debug/explain.exe"
+      },
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": false,
+      "sourceLanguages": [
+        "rust"
+      ]
+    }
+  ]
+}

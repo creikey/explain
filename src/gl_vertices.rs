@@ -13,7 +13,11 @@ pub mod vertex_attribs {
         size: 3 * std::mem::size_of::<f32>() as i32,
         components: 3,
     };
-
+    pub const POINT2_F32: VertexAttrib = VertexAttrib {
+        gl_type: gl::FLOAT,
+        size: 2 * std::mem::size_of::<f32>() as i32,
+        components: 2,
+    };
     pub const VECTOR2_F32: VertexAttrib = VertexAttrib {
         gl_type: gl::FLOAT,
         size: 2 * std::mem::size_of::<f32>() as i32,
@@ -99,28 +103,18 @@ impl<T> VertexData<T> {
     pub fn get_vertex(&self, index: usize) -> &T {
         &self.data[index]
     }
-    /// Automatically offsets the indices to the current length of the vertex array (so you can
-    /// specify each index relative such that it starts from 0). Will also update the data onto GPU
-    /// memory.
-    /// # Arguments
-    ///
-    /// * `new_data` - new vertex data, directly copied into opengl memory so better be contiguous!
-    /// * `new_indices` - new index order with which to use the vertices, used to avoid repetition
-    /// * `last_update` - If this is the last vertex update, will be stored in static instead of
-    /// dynamic memory for greater efficiency
-    pub fn append(&mut self, new_data: &mut Vec<T>, new_indices: &mut Vec<u32>, last_update: bool) {
-        for elem in new_indices.iter_mut() {
-            *elem += self.data.len() as u32;
-        }
-        self.data.append(new_data);
-        self.indices.append(new_indices);
 
+    pub fn set_vertex_data(&mut self, index: usize, data: T, last_update: bool) {
+        self.data[index] = data;
+        self.update_on_gpu(last_update);
+    }
+
+    fn update_on_gpu(&mut self, last_update: bool) {
         let storage_type = if last_update {
             gl::STATIC_DRAW
         } else {
             gl::DYNAMIC_DRAW
         };
-
         fn vec_size<T>(v: &Vec<T>) -> gl::types::GLsizeiptr {
             (v.len() * std::mem::size_of::<T>()) as gl::types::GLsizeiptr
         }
@@ -163,5 +157,24 @@ impl<T> VertexData<T> {
             gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
         }
+    }
+
+    /// Automatically offsets the indices to the current length of the vertex array (so you can
+    /// specify each index relative such that it starts from 0). Will also update the data onto GPU
+    /// memory.
+    /// # Arguments
+    ///
+    /// * `new_data` - new vertex data, directly copied into opengl memory so better be contiguous!
+    /// * `new_indices` - new index order with which to use the vertices, used to avoid repetition
+    /// * `last_update` - If this is the last vertex update, will be stored in static instead of
+    /// dynamic memory for greater efficiency
+    pub fn append(&mut self, new_data: &mut Vec<T>, new_indices: &mut Vec<u32>, last_update: bool) {
+        for elem in new_indices.iter_mut() {
+            *elem += self.data.len() as u32;
+        }
+        self.data.append(new_data);
+        self.indices.append(new_indices);
+
+        self.update_on_gpu(last_update);
     }
 }

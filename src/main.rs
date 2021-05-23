@@ -4,18 +4,45 @@ extern crate sdl2;
 
 pub mod gl_shaders;
 pub mod gl_vertices;
-pub mod line;
+mod line;
+mod text;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
 use std::time::Duration;
 
-use line::Line;
-
 pub trait Drawable {
     fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix4<f32>);
     fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>);
+}
+
+// https://www.khronos.org/opengl/wiki/OpenGL_Error
+extern "system" fn message_callback(
+    source: gl::types::GLenum,
+    t: gl::types::GLenum,
+    id: gl::types::GLuint,
+    severity: gl::types::GLenum,
+    length: gl::types::GLsizei,
+    message: *const gl::types::GLchar,
+    user_param: *mut gl::types::GLvoid,
+) {
+    unsafe {
+        let is_error = t == gl::DEBUG_TYPE_ERROR;
+
+        let type_name = if is_error {
+            String::from("ERROR")
+        } else {
+            format!("Type {}", t)
+        };
+        if is_error {
+            println!(
+                "GL {}: {}",
+                type_name,
+                std::ffi::CStr::from_ptr(message).to_str().unwrap()
+            );
+        }
+    }
 }
 
 pub fn main() {
@@ -23,8 +50,9 @@ pub fn main() {
     let video_subsystem = sdl_context.video().unwrap();
 
     let gl_attr = video_subsystem.gl_attr();
-    gl_attr.set_context_profile(GLProfile::Core);
-    gl_attr.set_context_version(3, 3);
+    gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
+    gl_attr.set_context_major_version(2);
+    gl_attr.set_context_minor_version(0);
 
     let window = video_subsystem
         .window("explain", 800, 600)
@@ -37,8 +65,8 @@ pub fn main() {
     let _ctx = window.gl_create_context().unwrap();
     gl::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const _);
 
-    debug_assert_eq!(gl_attr.context_profile(), GLProfile::Core);
-    debug_assert_eq!(gl_attr.context_version(), (3, 3));
+    debug_assert_eq!(gl_attr.context_profile(), GLProfile::GLES);
+    debug_assert_eq!(gl_attr.context_version(), (2, 0));
 
     // ui state
     // array of items that dynamically expands as user creates more items with the various tools
@@ -55,6 +83,8 @@ pub fn main() {
     let mut drawing_wireframe = false;
     unsafe {
         gl::Viewport(0, 0, 800, 600);
+        gl::Enable(gl::DEBUG_OUTPUT);
+        gl::DebugMessageCallback(Some(message_callback), std::ptr::null());
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
@@ -68,6 +98,18 @@ pub fn main() {
         let middle_down = ms.middle();
         let mouse_pos = na::Point3::new(ms.x() as f32, ms.y() as f32, 0.0);
         drop(ms);
+        // commits the item if it's there, if it's not does nothing.
+        fn commit_item(
+            items: &mut Vec<Box<dyn Drawable>>,
+            item_currently_creating: Option<Box<dyn Drawable>>,
+        ) -> Option<Box<dyn Drawable>> {
+            if item_currently_creating.is_some() {
+                items.push(item_currently_creating.unwrap());
+                None
+            } else {
+                item_currently_creating
+            }
+        }
         for event in event_pump.poll_iter() {
             use sdl2::mouse::MouseButton;
             match event {
@@ -82,16 +124,23 @@ pub fn main() {
                     mouse_btn: MouseButton::Left,
                     ..
                 } => {
-                    item_currently_creating = Some(Box::new(Line::new()));
+                    item_currently_creating = commit_item(&mut items, item_currently_creating);
+                    item_currently_creating = Some(Box::new(line::Line::new()));
                 }
                 Event::MouseButtonUp {
                     mouse_btn: MouseButton::Left,
                     ..
                 } => {
-                    if item_currently_creating.is_some() {
-                        items.push(item_currently_creating.unwrap());
-                        item_currently_creating = None;
-                    }
+                    item_currently_creating = commit_item(&mut items, item_currently_creating);
+                }
+
+                // text
+                Event::KeyDown {
+                    keycode: Some(Keycode::T),
+                    ..
+                } => {
+                    item_currently_creating = commit_item(&mut items, item_currently_creating);
+                    item_currently_creating = Some(Box::new(text::Text::new()));
                 }
 
                 // zooming
@@ -108,7 +157,7 @@ pub fn main() {
                     ) * camera_inv;*/
                     camera_inv = camera.pseudo_inverse(0.0001).unwrap();
                 }
-                
+
                 // panning
                 Event::MouseMotion { xrel, yrel, .. } => {
                     if middle_down {
