@@ -1,18 +1,18 @@
 #version 330 core
 
-layout (location = 0) in vec3 Position;
+layout (location = 0) in vec2 Position;
 layout (location = 1) in vec2 normal;
 
 out vec2 toEdge;
 
 uniform mat4 projection;
-uniform mat4 camera;
+uniform mat3 camera;
 uniform float width;
 
 void main()
 {
-    vec3 newPosition = (camera * vec4(Position, 1.0)).xyz;
+    vec2 newPosition = (camera * vec3(Position, 1.0)).xy;
     toEdge = normal * width;
     newPosition.xy += toEdge;
-    gl_Position = projection * vec4(newPosition, 1.0);
+    gl_Position = projection * vec4(vec3(newPosition, 0.0), 1.0);
 }

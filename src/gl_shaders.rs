@@ -1,7 +1,7 @@
 use gl;
-use std;
-use std::ffi::{CString};
 use nalgebra as na;
+use std;
+use std::ffi::CString;
 
 // based off of https://github.com/Nercury/rust-and-opengl-lessons/blob/master/lesson-03/src/render_gl.rs
 
@@ -39,13 +39,20 @@ impl ShaderProgram {
             );
         }
     }
-    pub fn write_float(&self, name: &str, f: f32) {
-       unsafe {
-            gl::Uniform1f(
+    pub fn write_mat3(&self, name: &str, mat: &na::Matrix3<f32>) {
+        unsafe {
+            gl::UniformMatrix3fv(
                 self.get_location(name),
-                f,
+                1,
+                gl::FALSE,
+                mat.as_slice().as_ptr(),
             );
-        } 
+        }
+    }
+    pub fn write_float(&self, name: &str, f: f32) {
+        unsafe {
+            gl::Uniform1f(self.get_location(name), f);
+        }
     }
     pub fn from_shaders(shaders: &[Shader]) -> Result<ShaderProgram, String> {
         let program_id = unsafe { gl::CreateProgram() };

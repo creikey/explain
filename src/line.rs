@@ -5,13 +5,13 @@ use crate::Drawable;
 use na::Vector2;
 use sdl2::event::Event;
 
-type P = na::Point3<f32>;
+type P2 = na::Point2<f32>;
 type V2 = Vector2<f32>;
 
 pub struct Line {
     shader_program: ShaderProgram,
-    gl_vertices: VertexData<(P, V2)>,
-    last_point: Option<P>,
+    gl_vertices: VertexData<(P2, V2)>,
+    last_point: Option<P2>,
 }
 
 impl Line {
@@ -22,26 +22,26 @@ impl Line {
         Line {
             last_point: None,
             shader_program,
-            gl_vertices: VertexData::new(vec![POINT3_F32, VECTOR2_F32]),
+            gl_vertices: VertexData::new(vec![POINT2_F32, VECTOR2_F32]),
         }
     }
 }
 
 impl Drawable for Line {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix4<f32>) {
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix3<f32>) {
         if self.gl_vertices.data_len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
-        self.shader_program.write_mat4("camera", camera);
+        self.shader_program.write_mat3("camera", camera);
         self.shader_program.write_float("width", 2.0);
         self.gl_vertices.draw();
     }
-    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>) -> bool {
+    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix3<f32>) -> bool {
         // TODO when line is committed move out of DYNAMIC_DRAW memory
         if let Event::MouseMotion { x, y, .. } = *e {
-            let new_point = (camera_inv).transform_point(&na::Point3::new(x as f32, y as f32, 0.0));
+            let new_point = (camera_inv).transform_point(&P2::new(x as f32, y as f32));
 
             if self.last_point.is_none() {
                 self.last_point = Some(new_point);

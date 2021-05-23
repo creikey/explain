@@ -8,12 +8,11 @@ use serde_json::{from_str, Map, Value};
 
 extern crate image;
 
-type P = na::Point3<f32>;
 type P2 = na::Point2<f32>;
 
 pub struct Text {
     shader_program: ShaderProgram,
-    gl_vertices: VertexData<(P, P2)>,
+    gl_vertices: VertexData<(P2, P2)>,
     texture: gl::types::GLuint,
     character_map: Map<String, Value>,
     size: (u64, u64),
@@ -27,7 +26,7 @@ impl Text {
         let shader_program = shader!("text.vert", "text.frag");
 
         use vertex_attribs::*;
-        let mut gl_vertices = VertexData::new(vec![POINT3_F32, POINT2_F32]);
+        let mut gl_vertices = VertexData::new(vec![POINT2_F32, POINT2_F32]);
         use image::DynamicImage;
         let img = image::open("src/arial-font.png").unwrap();
         let mut texture = 0;
@@ -91,17 +90,17 @@ impl Text {
 }
 
 impl Drawable for Text {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix4<f32>) {
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix3<f32>) {
         self.shader_program.set_used();
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.texture);
         }
         self.shader_program.write_mat4("projection", projection);
-        self.shader_program.write_mat4("camera", camera);
+        self.shader_program.write_mat3("camera", camera);
         self.gl_vertices.draw();
     }
 
-    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>) -> bool {
+    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix3<f32>) -> bool {
         if let Event::KeyDown { keycode, .. } = *e {
             return keycode.unwrap() != sdl2::keyboard::Keycode::Return;
         }
@@ -137,30 +136,27 @@ impl Drawable for Text {
                 self.character_map.get("size").unwrap().as_i64().unwrap() - origin_y;
             let mut new_vertices = vec![
                 (
-                    P::new(self.width_offset + origin_x, vertical_offset as f32, 0.0),
+                    P2::new(self.width_offset + origin_x, vertical_offset as f32),
                     P2::new(x, y),
                 ), // upper left
                 (
-                    P::new(
+                    P2::new(
                         self.width_offset + origin_x + width_in_px as f32,
                         vertical_offset as f32,
-                        0.0,
                     ),
                     P2::new(x + width, y),
                 ), // upper right
                 (
-                    P::new(
+                    P2::new(
                         self.width_offset + origin_x + width_in_px as f32,
                         (vertical_offset + height_in_px) as f32,
-                        0.0,
                     ),
                     P2::new(x + width, y + height),
                 ), // lower right
                 (
-                    P::new(
+                    P2::new(
                         self.width_offset + origin_x,
                         (vertical_offset + height_in_px) as f32,
-                        0.0,
                     ),
                     P2::new(x, y + height),
                 ), // lower left

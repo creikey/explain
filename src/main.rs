@@ -13,12 +13,11 @@ use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
 use std::time::Duration;
 
-type P = na::Point3<f32>;
 type P2 = na::Point2<f32>;
 
 pub trait Drawable {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix4<f32>);
-    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix4<f32>) -> bool;
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix3<f32>);
+    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix3<f32>) -> bool;
 }
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
@@ -82,7 +81,7 @@ pub fn main() {
 
     // gl stuff
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
-    let mut camera = nalgebra::Matrix4::new_translation(&na::Vector3::new(0.0, 0.0, 0.0));
+    let mut camera = nalgebra::Matrix3::new_translation(&na::Vector2::new(0.0, 0.0));
     let mut camera_inv = camera;
     let mut drawing_wireframe = false;
     unsafe {
@@ -100,7 +99,7 @@ pub fn main() {
 
         let ms = event_pump.mouse_state();
         let middle_down = ms.middle();
-        let mouse_pos = na::Point3::new(ms.x() as f32, ms.y() as f32, 0.0);
+        let mouse_pos = P2::new(ms.x() as f32, ms.y() as f32);
         drop(ms);
         // commits the item if it's there, if it's not does nothing.
         fn commit_item(
@@ -167,8 +166,8 @@ pub fn main() {
                     // zooming
                     Event::MouseWheel { y, .. } => {
                         let scale_delta = 1.0 + (y as f32) * 0.04;
-                        let scale_mat = na::Matrix4::new_nonuniform_scaling_wrt_point(
-                            &na::Vector3::new(scale_delta, scale_delta, 0.0),
+                        let scale_mat = na::Matrix3::new_nonuniform_scaling_wrt_point(
+                            &na::Vector2::new(scale_delta, scale_delta),
                             &mouse_pos,
                         );
                         camera = scale_mat * camera;
@@ -182,7 +181,7 @@ pub fn main() {
                     // panning
                     Event::MouseMotion { xrel, yrel, .. } => {
                         if middle_down {
-                            let movement = na::Vector3::new(xrel as f32, yrel as f32, 0.0);
+                            let movement = na::Vector2::new(xrel as f32, yrel as f32);
                             camera = camera.append_translation(&movement);
                             camera_inv = camera.pseudo_inverse(0.0001).unwrap();
                         }
