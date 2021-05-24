@@ -8,16 +8,36 @@ pub mod gl_vertices;
 mod line;
 mod text;
 
-use sdl2::event::Event;
+use sdl2::{event::Event, mouse};
 use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
 use std::time::Duration;
 
+// TODO put all these type aliases into util mod
 type P2 = na::Point2<f32>;
+type V2 = na::Vector2<f32>;
+
+pub struct Camera {
+    pub zoom: f32,
+    pub offset: V2,
+}
+
+impl Camera {
+    fn new() -> Self {
+        Self {
+            zoom: 0.0,
+            offset: V2::new(0.0, 0.0),
+        }
+    }
+    fn canvas_to_global(&self, canvas: P2) -> P2 {
+        canvas - self.offset
+    }
+    // TODO get the methods from the shader to here for stuff like selection, need to know screen space coords of stuff!
+}
 
 pub trait Drawable {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix3<f32>);
-    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix3<f32>) -> bool;
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &Camera);
+    fn process_event(&mut self, e: &Event, camera: &Camera) -> bool;
 }
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
@@ -81,8 +101,7 @@ pub fn main() {
 
     // gl stuff
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
-    let mut camera = nalgebra::Matrix3::new_translation(&na::Vector2::new(0.0, 0.0));
-    let mut camera_inv = camera;
+    let mut camera = Camera::new();
     let mut drawing_wireframe = false;
     unsafe {
         gl::Viewport(0, 0, 800, 600);
@@ -118,7 +137,7 @@ pub fn main() {
             // pass event on through trait
             let mut consumed_event = false;
             if let Some(item) = &mut item_currently_creating {
-                consumed_event = item.process_event(&event, &camera_inv);
+                consumed_event = item.process_event(&event, &camera);
             }
             if !consumed_event {
                 match event {
@@ -150,7 +169,7 @@ pub fn main() {
                         ..
                     } => {
                         item_currently_creating = commit_item(&mut items, item_currently_creating);
-                        let global_pos = (camera_inv).transform_point(&mouse_pos);
+                        let global_pos = mouse_pos;
                         item_currently_creating = Some(Box::new(text::Text::new(P2::new(
                             global_pos.x,
                             global_pos.y,
@@ -166,24 +185,26 @@ pub fn main() {
                     // zooming
                     Event::MouseWheel { y, .. } => {
                         let scale_delta = 1.0 + (y as f32) * 0.04;
+                        camera.zoom += (y as f32) * 0.04;
+                        camera.offset = (scale_delta*camera.offset + (mouse_pos.coords
+                            - V2::new(mouse_pos.x * scale_delta, mouse_pos.y * scale_delta)))/(1.0 + camera.zoom);
+                        println!("{}", camera.offset);
                         let scale_mat = na::Matrix3::new_nonuniform_scaling_wrt_point(
                             &na::Vector2::new(scale_delta, scale_delta),
                             &mouse_pos,
                         );
-                        camera = scale_mat * camera;
-                        /*camera_inv = na::Matrix4::new_nonuniform_scaling_wrt_point(
-                            &na::Vector3::new(inv_scale_delta, inv_scale_delta, 0.0),
-                            &mouse_pos,
-                        ) * camera_inv;*/
-                        camera_inv = camera.pseudo_inverse(0.0001).unwrap();
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::U),
+                        ..
+                    } => {
+                        camera.zoom += 5.0;
                     }
 
                     // panning
                     Event::MouseMotion { xrel, yrel, .. } => {
                         if middle_down {
-                            let movement = na::Vector2::new(xrel as f32, yrel as f32);
-                            camera = camera.append_translation(&movement);
-                            camera_inv = camera.pseudo_inverse(0.0001).unwrap();
+                            camera.offset += V2::new(xrel as f32, yrel as f32);
                         }
                     }
 

@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::Drawable;
+use crate::{Camera, Drawable};
 use na::Vector2;
 use sdl2::event::Event;
 
@@ -11,6 +11,7 @@ type V2 = Vector2<f32>;
 pub struct Line {
     shader_program: ShaderProgram,
     gl_vertices: VertexData<(P2, V2)>,
+    scale: f32,
     last_point: Option<P2>,
 }
 
@@ -22,26 +23,32 @@ impl Line {
         Line {
             last_point: None,
             shader_program,
+            scale: 1.0,
             gl_vertices: VertexData::new(vec![POINT2_F32, VECTOR2_F32]),
         }
     }
 }
 
 impl Drawable for Line {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &na::Matrix3<f32>) {
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &Camera) {
         if self.gl_vertices.data_len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
-        self.shader_program.write_mat3("camera", camera);
         self.shader_program.write_float("width", 2.0);
-        self.gl_vertices.draw();
+        self.shader_program.write_float("camera_zoom", camera.zoom);
+        self.shader_program.write_vec2("camera_offset", &camera.offset);
+
+        self.gl_vertices.draw();        
     }
-    fn process_event(&mut self, e: &Event, camera_inv: &na::Matrix3<f32>) -> bool {
+    fn process_event(&mut self, e: &Event, camera: &Camera) -> bool {
         // TODO when line is committed move out of DYNAMIC_DRAW memory
+        self.shader_program.set_used();
+        self.shader_program.write_float("scale", camera.zoom);
+        self.scale = camera.zoom;
         if let Event::MouseMotion { x, y, .. } = *e {
-            let new_point = (camera_inv).transform_point(&P2::new(x as f32, y as f32));
+            let new_point = camera.canvas_to_global(P2::new(x as f32, y as f32));
 
             if self.last_point.is_none() {
                 self.last_point = Some(new_point);

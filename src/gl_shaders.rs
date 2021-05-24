@@ -49,6 +49,24 @@ impl ShaderProgram {
             );
         }
     }
+    pub fn write_point2(&self, name: &str, point: &na::Point2<f32>) {
+        unsafe {
+            gl::Uniform2fv(
+                self.get_location(name),
+                1,
+                [point.x, point.y].as_ptr(), // TODO figure out how to slice into pointer without copy like the matrices
+            );
+        }
+    }
+    pub fn write_vec2(&self, name: &str, vec: &na::Vector2<f32>) {
+        unsafe {
+            gl::Uniform2fv(
+                self.get_location(name),
+                1,
+                [vec.x, vec.y].as_ptr(), // TODO figure out how to slice into pointer without copy like the matrices
+            );
+        }
+    }
     pub fn write_float(&self, name: &str, f: f32) {
         unsafe {
             gl::Uniform1f(self.get_location(name), f);
