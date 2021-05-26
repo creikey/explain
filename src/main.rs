@@ -8,9 +8,9 @@ pub mod gl_vertices;
 mod line;
 mod text;
 
-use sdl2::{event::Event, mouse};
 use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
+use sdl2::{event::Event, mouse};
 use std::time::Duration;
 
 // TODO put all these type aliases into util mod
@@ -29,10 +29,33 @@ impl Camera {
             offset: V2::new(0.0, 0.0),
         }
     }
-    fn canvas_to_global(&self, canvas: P2) -> P2 {
-        canvas - self.offset
+    fn canvas_to_world(&self, canvas_coordinate: P2) -> P2 {
+        (canvas_coordinate * 2.0f32.powf(self.zoom)) + self.offset
+    }
+    fn world_to_canvas(&self, world_coordinate: P2) -> P2 {
+        (world_coordinate - self.offset) / 2.0f32.powf(self.zoom)
     }
     // TODO get the methods from the shader to here for stuff like selection, need to know screen space coords of stuff!
+}
+
+#[cfg(test)]
+mod camera_tests {
+    use super::*;
+    #[test]
+    fn transforms_are_inverse() {
+        let mut c = Camera::new();
+        c.zoom = 1.7;
+        c.offset = V2::new(321.0, -523.0);
+        let input_point = P2::new(315.0, 71.0);
+        assert_eq!(
+            input_point,
+            c.canvas_to_world(c.world_to_canvas(input_point))
+        );
+        assert_eq!(
+            input_point,
+            c.world_to_canvas(c.canvas_to_world(input_point))
+        );
+    }
 }
 
 pub trait Drawable {
@@ -132,6 +155,7 @@ pub fn main() {
                 item_currently_creating
             }
         }
+        // println!("{}", camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom)));
         for event in event_pump.poll_iter() {
             use sdl2::mouse::MouseButton;
             // pass event on through trait
@@ -185,20 +209,24 @@ pub fn main() {
                     // zooming
                     Event::MouseWheel { y, .. } => {
                         let scale_delta = 1.0 + (y as f32) * 0.04;
+                        // let before_zoom_world_position = camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
+                        // let before_zoom_world_position = camera.offset + mouse_pos.coords;
                         camera.zoom += (y as f32) * 0.04;
-                        camera.offset = (scale_delta*camera.offset + (mouse_pos.coords
-                            - V2::new(mouse_pos.x * scale_delta, mouse_pos.y * scale_delta)))/(1.0 + camera.zoom);
-                        println!("{}", camera.offset);
+                        // let after_zoom_world_position =
+                            // camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
+                        // camera.offset += before_zoom_world_position - after_zoom_world_position;
+                        // println!("{} , {}", before_zoom_world_position, after_zoom_world_position);
                         let scale_mat = na::Matrix3::new_nonuniform_scaling_wrt_point(
                             &na::Vector2::new(scale_delta, scale_delta),
                             &mouse_pos,
                         );
                     }
                     Event::KeyDown {
+                        // TODO remove this it's a hack for testing zoom stuff
                         keycode: Some(Keycode::U),
                         ..
                     } => {
-                        camera.zoom += 5.0;
+                        camera.offset = V2::new(0.0, 0.0);
                     }
 
                     // panning
