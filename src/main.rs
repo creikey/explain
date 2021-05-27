@@ -29,13 +29,16 @@ impl Camera {
             offset: V2::new(0.0, 0.0),
         }
     }
+    // WARNING: IF CHANGE FUNCTIONS, UPDATE IN THE SHADERS
+    // as the vertices of shaders are stored in WORLD coordinates,
+    // the shader uses the world_to_canvas function in glsl, so if it's changed here it MUST be updated in the shader as well.
+    // TODO maybe figure out a way to put this logic into a matrix transform so code doesn't have to be updated across two mediums?
     fn canvas_to_world(&self, canvas_coordinate: P2) -> P2 {
-        (canvas_coordinate * 2.0f32.powf(self.zoom)) + self.offset
+        (canvas_coordinate + self.offset) * 2.0f32.powf(self.zoom)
     }
     fn world_to_canvas(&self, world_coordinate: P2) -> P2 {
-        (world_coordinate - self.offset) / 2.0f32.powf(self.zoom)
+        (world_coordinate) / 2.0f32.powf(self.zoom) - self.offset
     }
-    // TODO get the methods from the shader to here for stuff like selection, need to know screen space coords of stuff!
 }
 
 #[cfg(test)]
@@ -44,9 +47,12 @@ mod camera_tests {
     #[test]
     fn transforms_are_inverse() {
         let mut c = Camera::new();
-        c.zoom = 1.7;
-        c.offset = V2::new(321.0, -523.0);
-        let input_point = P2::new(315.0, 71.0);
+        // whole numbers so there aren't any tiny float imprecision problems with assert_eq
+        // I would rather not use "about equal" tests as that may be indicative of a small problem with the inverse
+        c.zoom = 2.0;
+        c.offset = V2::new(300.0, -500.0);
+        let input_point = P2::new(20.0, -25.0);
+        println!("{}", c.world_to_canvas(input_point));
         assert_eq!(
             input_point,
             c.canvas_to_world(c.world_to_canvas(input_point))
@@ -211,9 +217,13 @@ pub fn main() {
                         let scale_delta = 1.0 + (y as f32) * 0.04;
                         // let before_zoom_world_position = camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
                         // let before_zoom_world_position = camera.offset + mouse_pos.coords;
-                        camera.zoom += (y as f32) * 0.04;
+                        let before_zoom = camera.canvas_to_world(mouse_pos);
+                        camera.zoom -= (y as f32) * 0.04;
+                        let after_zoom = camera.canvas_to_world(mouse_pos);
+                        camera.offset += camera.world_to_canvas(before_zoom) - camera.world_to_canvas(after_zoom);
+                        // println!("{}", before_zoom - after_zoom);
                         // let after_zoom_world_position =
-                            // camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
+                        // camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
                         // camera.offset += before_zoom_world_position - after_zoom_world_position;
                         // println!("{} , {}", before_zoom_world_position, after_zoom_world_position);
                         let scale_mat = na::Matrix3::new_nonuniform_scaling_wrt_point(
@@ -232,7 +242,7 @@ pub fn main() {
                     // panning
                     Event::MouseMotion { xrel, yrel, .. } => {
                         if middle_down {
-                            camera.offset += V2::new(xrel as f32, yrel as f32);
+                            camera.offset -= V2::new(xrel as f32, yrel as f32);
                         }
                     }
 

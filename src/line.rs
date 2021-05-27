@@ -39,7 +39,7 @@ impl Drawable for Line {
         self.shader_program.write_float("width", 2.0);
         self.shader_program.write_float("camera_zoom", camera.zoom);
         self.shader_program.write_vec2("camera_offset", &camera.offset);
-
+        // println!("scale: {} , camera zoom: {}", self.scale, camera.zoom);
         self.gl_vertices.draw();        
     }
     fn process_event(&mut self, e: &Event, camera: &Camera) -> bool {
@@ -48,7 +48,9 @@ impl Drawable for Line {
         self.shader_program.write_float("scale", camera.zoom);
         self.scale = camera.zoom;
         if let Event::MouseMotion { x, y, .. } = *e {
-            let new_point = camera.canvas_to_global(P2::new(x as f32, y as f32));
+            let new_point = camera.canvas_to_world(P2::new(x as f32, y as f32));
+            // let new_point = P2::new(x as f32, y as f32);
+            // println!("{}", camera.world_to_canvas(new_point));
 
             if self.last_point.is_none() {
                 self.last_point = Some(new_point);
