@@ -63,7 +63,7 @@ impl ShaderProgram {
             gl::Uniform2fv(
                 self.get_location(name),
                 1,
-                [vec.x, vec.y].as_ptr(), // TODO figure out how to slice into pointer without copy like the matrices
+                [vec.x, vec.y].as_ptr(),
             );
         }
     }
