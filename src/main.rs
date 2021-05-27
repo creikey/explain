@@ -39,6 +39,12 @@ impl Camera {
     fn world_to_canvas(&self, world_coordinate: P2) -> P2 {
         (world_coordinate) / 2.0f32.powf(self.zoom) - self.offset
     }
+    fn canvas_to_local(&self, object_scale: f32, canvas_coordinate: P2) -> P2 {
+        (canvas_coordinate + self.offset) / 2.0f32.powf(object_scale - self.zoom)
+    }
+    fn local_to_canvas(&self, object_scale: f32, local_coordinate: P2) -> P2 {
+        local_coordinate * 2.0f32.powf(object_scale - self.zoom) - self.offset
+    }
 }
 
 #[cfg(test)]
@@ -52,7 +58,6 @@ mod camera_tests {
         c.zoom = 2.0;
         c.offset = V2::new(300.0, -500.0);
         let input_point = P2::new(20.0, -25.0);
-        println!("{}", c.world_to_canvas(input_point));
         assert_eq!(
             input_point,
             c.canvas_to_world(c.world_to_canvas(input_point))
@@ -161,7 +166,6 @@ pub fn main() {
                 item_currently_creating
             }
         }
-        // println!("{}", camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom)));
         for event in event_pump.poll_iter() {
             use sdl2::mouse::MouseButton;
             // pass event on through trait
@@ -221,11 +225,7 @@ pub fn main() {
                         camera.zoom -= (y as f32) * 0.04;
                         let after_zoom = camera.canvas_to_world(mouse_pos);
                         camera.offset += camera.world_to_canvas(before_zoom) - camera.world_to_canvas(after_zoom);
-                        // println!("{}", before_zoom - after_zoom);
-                        // let after_zoom_world_position =
-                        // camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
-                        // camera.offset += before_zoom_world_position - after_zoom_world_position;
-                        // println!("{} , {}", before_zoom_world_position, after_zoom_world_position);
+                        println!("{}",camera.offset);
                         let scale_mat = na::Matrix3::new_nonuniform_scaling_wrt_point(
                             &na::Vector2::new(scale_delta, scale_delta),
                             &mouse_pos,
@@ -236,7 +236,8 @@ pub fn main() {
                         keycode: Some(Keycode::U),
                         ..
                     } => {
-                        camera.offset = V2::new(0.0, 0.0);
+                        // camera.offset = V2::new(0.0, 0.0);
+                        camera.zoom += 1.0;
                     }
 
                     // panning

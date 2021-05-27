@@ -48,7 +48,7 @@ impl Drawable for Line {
         self.shader_program.write_float("scale", camera.zoom);
         self.scale = camera.zoom;
         if let Event::MouseMotion { x, y, .. } = *e {
-            let new_point = camera.canvas_to_world(P2::new(x as f32, y as f32));
+            let new_point = camera.canvas_to_local(self.scale, P2::new(x as f32, y as f32));
             // let new_point = P2::new(x as f32, y as f32);
             // println!("{}", camera.world_to_canvas(new_point));
 
