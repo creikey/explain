@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{Drawable, Camera};
+use crate::{Drawable, Movement};
 use na::Point3;
 use sdl2::event::Event;
 use serde_json::{from_str, Map, Value};
@@ -9,6 +9,7 @@ use serde_json::{from_str, Map, Value};
 extern crate image;
 
 type P2 = na::Point2<f32>;
+type V2 = na::Vector2<f32>;
 
 pub struct Text {
     shader_program: ShaderProgram,
@@ -90,7 +91,10 @@ impl Text {
 }
 
 impl Drawable for Text {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &Camera) {
+    fn camera_move(&mut self, movement: &Movement) {
+
+    }
+    fn draw(&self, projection: &na::Matrix4<f32>) {
         self.shader_program.set_used();
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.texture);
@@ -99,7 +103,7 @@ impl Drawable for Text {
         self.gl_vertices.draw();
     }
 
-    fn process_event(&mut self, e: &Event, camera: &Camera) -> bool {
+    fn process_event(&mut self, e: &Event) -> bool {
         if let Event::KeyDown { keycode, .. } = *e {
             return keycode.unwrap() != sdl2::keyboard::Keycode::Return;
         }

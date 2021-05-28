@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{Camera, Drawable};
+use crate::{Drawable, Movement};
 use na::Vector2;
 use sdl2::event::Event;
 
@@ -12,6 +12,7 @@ pub struct Line {
     shader_program: ShaderProgram,
     gl_vertices: VertexData<(P2, V2)>,
     scale: f32,
+    offset: V2,
     last_point: Option<P2>,
 }
 
@@ -24,34 +25,38 @@ impl Line {
             last_point: None,
             shader_program,
             scale: 1.0,
+            offset: V2::new(0.0, 0.0),
             gl_vertices: VertexData::new(vec![POINT2_F32, VECTOR2_F32]),
         }
     }
 }
 
 impl Drawable for Line {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &Camera) {
+    fn camera_move(&mut self, movement: &Movement) {
+        // TODO figure out a way to clamp these numbers from getting too big while still keeping information about the
+        // scale of the object
+        // TODO disable scaling by the camera while the line is being created
+        self.scale *= movement.zoom;
+        self.offset = movement.zoom*(self.offset - movement.wrt_point.coords) + movement.wrt_point.coords;
+        self.offset -= movement.pan;
+    }
+    fn draw(&self, projection: &na::Matrix4<f32>) {
         if self.gl_vertices.data_len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
+
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
+        self.shader_program.write_vec2("offset", &self.offset);
+        self.shader_program.write_float("scale", self.scale);
         self.shader_program.write_float("width", 2.0);
-        self.shader_program.write_float("camera_zoom", camera.zoom);
-        self.shader_program.write_vec2("camera_offset", &camera.offset);
-        // println!("scale: {} , camera zoom: {}", self.scale, camera.zoom);
-        self.gl_vertices.draw();        
+        self.gl_vertices.draw();
     }
-    fn process_event(&mut self, e: &Event, camera: &Camera) -> bool {
+    fn process_event(&mut self, e: &Event) -> bool {
         // TODO when line is committed move out of DYNAMIC_DRAW memory
-        self.shader_program.set_used();
-        self.shader_program.write_float("scale", camera.zoom);
-        self.scale = camera.zoom;
-        if let Event::MouseMotion { x, y, .. } = *e {
-            let new_point = camera.canvas_to_local(self.scale, P2::new(x as f32, y as f32));
-            // let new_point = P2::new(x as f32, y as f32);
-            // println!("{}", camera.world_to_canvas(new_point));
 
+        if let Event::MouseMotion { x, y, .. } = *e {
+            let new_point = P2::new(x as f32, y as f32);
             if self.last_point.is_none() {
                 self.last_point = Some(new_point);
                 return true;

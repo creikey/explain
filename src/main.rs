@@ -17,61 +17,26 @@ use std::time::Duration;
 type P2 = na::Point2<f32>;
 type V2 = na::Vector2<f32>;
 
-pub struct Camera {
-    pub zoom: f32,
-    pub offset: V2,
+pub struct Movement {
+    wrt_point: P2,
+    zoom: f32,
+    pan: V2,
 }
 
-impl Camera {
+impl Movement {
     fn new() -> Self {
         Self {
-            zoom: 0.0,
-            offset: V2::new(0.0, 0.0),
+            wrt_point: P2::new(0.0, 0.0),
+            zoom: 1.0,
+            pan: V2::new(0.0, 0.0),
         }
-    }
-    // WARNING: IF CHANGE FUNCTIONS, UPDATE IN THE SHADERS
-    // as the vertices of shaders are stored in WORLD coordinates,
-    // the shader uses the world_to_canvas function in glsl, so if it's changed here it MUST be updated in the shader as well.
-    // TODO maybe figure out a way to put this logic into a matrix transform so code doesn't have to be updated across two mediums?
-    fn canvas_to_world(&self, canvas_coordinate: P2) -> P2 {
-        (canvas_coordinate + self.offset) * 2.0f32.powf(self.zoom)
-    }
-    fn world_to_canvas(&self, world_coordinate: P2) -> P2 {
-        (world_coordinate) / 2.0f32.powf(self.zoom) - self.offset
-    }
-    fn canvas_to_local(&self, object_scale: f32, canvas_coordinate: P2) -> P2 {
-        (canvas_coordinate + self.offset) / 2.0f32.powf(object_scale - self.zoom)
-    }
-    fn local_to_canvas(&self, object_scale: f32, local_coordinate: P2) -> P2 {
-        local_coordinate * 2.0f32.powf(object_scale - self.zoom) - self.offset
-    }
-}
-
-#[cfg(test)]
-mod camera_tests {
-    use super::*;
-    #[test]
-    fn transforms_are_inverse() {
-        let mut c = Camera::new();
-        // whole numbers so there aren't any tiny float imprecision problems with assert_eq
-        // I would rather not use "about equal" tests as that may be indicative of a small problem with the inverse
-        c.zoom = 2.0;
-        c.offset = V2::new(300.0, -500.0);
-        let input_point = P2::new(20.0, -25.0);
-        assert_eq!(
-            input_point,
-            c.canvas_to_world(c.world_to_canvas(input_point))
-        );
-        assert_eq!(
-            input_point,
-            c.world_to_canvas(c.canvas_to_world(input_point))
-        );
     }
 }
 
 pub trait Drawable {
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &Camera);
-    fn process_event(&mut self, e: &Event, camera: &Camera) -> bool;
+    fn camera_move(&mut self, m: &Movement);
+    fn draw(&self, projection: &na::Matrix4<f32>);
+    fn process_event(&mut self, e: &Event) -> bool;
 }
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
@@ -135,7 +100,6 @@ pub fn main() {
 
     // gl stuff
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
-    let mut camera = Camera::new();
     let mut drawing_wireframe = false;
     unsafe {
         gl::Viewport(0, 0, 800, 600);
@@ -166,12 +130,14 @@ pub fn main() {
                 item_currently_creating
             }
         }
+
+        let mut cur_movement = Movement::new();
         for event in event_pump.poll_iter() {
             use sdl2::mouse::MouseButton;
             // pass event on through trait
             let mut consumed_event = false;
             if let Some(item) = &mut item_currently_creating {
-                consumed_event = item.process_event(&event, &camera);
+                consumed_event = item.process_event(&event);
             }
             if !consumed_event {
                 match event {
@@ -219,31 +185,14 @@ pub fn main() {
                     // zooming
                     Event::MouseWheel { y, .. } => {
                         let scale_delta = 1.0 + (y as f32) * 0.04;
-                        // let before_zoom_world_position = camera.offset + (mouse_pos.coords * 2.0f32.powf(camera.zoom));
-                        // let before_zoom_world_position = camera.offset + mouse_pos.coords;
-                        let before_zoom = camera.canvas_to_world(mouse_pos);
-                        camera.zoom -= (y as f32) * 0.04;
-                        let after_zoom = camera.canvas_to_world(mouse_pos);
-                        camera.offset += camera.world_to_canvas(before_zoom) - camera.world_to_canvas(after_zoom);
-                        println!("{}",camera.offset);
-                        let scale_mat = na::Matrix3::new_nonuniform_scaling_wrt_point(
-                            &na::Vector2::new(scale_delta, scale_delta),
-                            &mouse_pos,
-                        );
-                    }
-                    Event::KeyDown {
-                        // TODO remove this it's a hack for testing zoom stuff
-                        keycode: Some(Keycode::U),
-                        ..
-                    } => {
-                        // camera.offset = V2::new(0.0, 0.0);
-                        camera.zoom += 1.0;
+                        cur_movement.zoom = scale_delta;
+                        cur_movement.wrt_point = mouse_pos;
                     }
 
                     // panning
                     Event::MouseMotion { xrel, yrel, .. } => {
                         if middle_down {
-                            camera.offset -= V2::new(xrel as f32, yrel as f32);
+                            cur_movement.pan -= V2::new(xrel as f32, yrel as f32);
                         }
                     }
 
@@ -278,14 +227,16 @@ pub fn main() {
         }
 
         let mat = projection.as_matrix();
-        for i in items.iter() {
-            i.draw(mat, &camera);
+        if let Some(item) = &mut item_currently_creating {
+            item.camera_move(&cur_movement);
+            item.draw(mat);
         }
-        if let Some(item) = &item_currently_creating {
-            item.draw(mat, &camera);
+        for i in items.iter_mut() {
+            i.camera_move(&cur_movement);
+            i.draw(mat);
         }
 
         window.gl_swap_window();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60)); // TODO take exactly 1/60s every time by accounting for how long computation above takes
     }
 }
