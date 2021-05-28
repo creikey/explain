@@ -33,6 +33,35 @@ impl Movement {
     }
 }
 
+pub struct MovedAround {
+    scale: f32,
+    offset: V2,
+}
+
+impl MovedAround {
+    fn new() -> Self {
+        Self {
+            scale: 1.0,
+            offset: V2::new(0.0, 0.0),
+        }
+    }
+    fn camera_move(&mut self, movement: &Movement) {
+        // TODO figure out a way to clamp these numbers from getting too big while still keeping information about the
+        // scale of the object
+        // TODO disable scaling by the camera while the line is being created
+        self.scale *= movement.zoom;
+        self.offset = movement.zoom*(self.offset - movement.wrt_point.coords) + movement.wrt_point.coords;
+        self.offset -= movement.pan;
+    }
+    /// Writes to the `offset` and `scale` uniforms of the shader. Intended to be
+    /// processed in the vertex shader like:
+    /// `vec2 newPosition = scale*Position + offset;`
+    fn write_to_shader(&self, program: &gl_shaders::ShaderProgram) {
+        program.write_vec2("offset", &self.offset);
+        program.write_float("scale", self.scale);
+    }
+}
+
 pub trait Drawable {
     fn camera_move(&mut self, m: &Movement);
     fn draw(&self, projection: &na::Matrix4<f32>);

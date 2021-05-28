@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{Drawable, Movement};
+use crate::{Drawable, Movement, MovedAround};
 use na::Point3;
 use sdl2::event::Event;
 use serde_json::{from_str, Map, Value};
@@ -16,6 +16,7 @@ pub struct Text {
     gl_vertices: VertexData<(P2, P2)>,
     texture: gl::types::GLuint,
     character_map: Map<String, Value>,
+    moved_around: MovedAround,
     size: (u64, u64),
     origin: P2,
     width_offset: f32,
@@ -84,6 +85,7 @@ impl Text {
             size,
             character_map,
             origin,
+            moved_around: MovedAround::new(),
             width_offset: 0.0,
             text: String::from("A"),
         }
@@ -92,7 +94,7 @@ impl Text {
 
 impl Drawable for Text {
     fn camera_move(&mut self, movement: &Movement) {
-
+        self.moved_around.camera_move(movement);
     }
     fn draw(&self, projection: &na::Matrix4<f32>) {
         self.shader_program.set_used();
@@ -100,6 +102,7 @@ impl Drawable for Text {
             gl::BindTexture(gl::TEXTURE_2D, self.texture);
         }
         self.shader_program.write_mat4("projection", projection);
+        self.moved_around.write_to_shader(&self.shader_program);
         self.gl_vertices.draw();
     }
 

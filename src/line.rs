@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{Drawable, Movement};
+use crate::{Drawable, MovedAround, Movement};
 use na::Vector2;
 use sdl2::event::Event;
 
@@ -11,9 +11,8 @@ type V2 = Vector2<f32>;
 pub struct Line {
     shader_program: ShaderProgram,
     gl_vertices: VertexData<(P2, V2)>,
-    scale: f32,
-    offset: V2,
     last_point: Option<P2>,
+    moved_around: MovedAround,
 }
 
 impl Line {
@@ -24,31 +23,25 @@ impl Line {
         Line {
             last_point: None,
             shader_program,
-            scale: 1.0,
-            offset: V2::new(0.0, 0.0),
+            moved_around: MovedAround::new(),
             gl_vertices: VertexData::new(vec![POINT2_F32, VECTOR2_F32]),
         }
     }
 }
 
 impl Drawable for Line {
+    // TODO figure out how to give this behavior to an object without
+    // copy and pasting this method everywhere
     fn camera_move(&mut self, movement: &Movement) {
-        // TODO figure out a way to clamp these numbers from getting too big while still keeping information about the
-        // scale of the object
-        // TODO disable scaling by the camera while the line is being created
-        self.scale *= movement.zoom;
-        self.offset = movement.zoom*(self.offset - movement.wrt_point.coords) + movement.wrt_point.coords;
-        self.offset -= movement.pan;
+        self.moved_around.camera_move(movement);
     }
     fn draw(&self, projection: &na::Matrix4<f32>) {
         if self.gl_vertices.data_len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
-
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
-        self.shader_program.write_vec2("offset", &self.offset);
-        self.shader_program.write_float("scale", self.scale);
+        self.moved_around.write_to_shader(&self.shader_program);
         self.shader_program.write_float("width", 2.0);
         self.gl_vertices.draw();
     }
