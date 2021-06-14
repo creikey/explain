@@ -30,7 +30,7 @@ impl Text {
         use vertex_attribs::*;
         let mut gl_vertices = VertexData::new(vec![POINT2_F32, POINT2_F32]);
         use image::DynamicImage;
-        let img = image::open("src/arial-font.png").unwrap();
+        let img = image::load_from_memory(include_bytes!("arial-font.png")).unwrap();
         let mut texture = 0;
         let mut size = (0, 0);
         unsafe {
