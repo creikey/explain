@@ -6,3 +6,4 @@ Follow the steps [on the sdl2 crates page](https://crates.io/crates/sdl2) for yo
 
 ## TODO
  - Port to the web!!! [this issue](https://github.com/rust-lang/rust/issues/85821), [and this one](https://github.com/Rust-SDL2/rust-sdl2/issues/884)
+ - Use fixed point math for the zooming to avoid small errors exploding out into wrong positions (this will cause the test to pass)
