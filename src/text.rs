@@ -93,6 +93,9 @@ impl Text {
 }
 
 impl Drawable for Text {
+    fn get_moved_around(&self) -> &MovedAround {
+        &self.moved_around
+    }
     fn camera_move(&mut self, movement: &Movement) {
         self.moved_around.camera_move(movement);
     }

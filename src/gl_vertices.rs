@@ -96,6 +96,9 @@ impl<T> VertexData<T> {
         }
         self.deactivate();
     }
+    pub fn data(&mut self) -> &mut Vec<T> {
+        &mut self.data
+    }
     /// Length of vertices and attributes
     pub fn data_len(&self) -> usize {
         self.data.len()
@@ -109,7 +112,7 @@ impl<T> VertexData<T> {
         self.update_on_gpu(last_update);
     }
 
-    fn update_on_gpu(&mut self, last_update: bool) {
+    pub fn update_on_gpu(&mut self, last_update: bool) {
         let storage_type = if last_update {
             gl::STATIC_DRAW
         } else {

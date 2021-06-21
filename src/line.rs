@@ -30,6 +30,10 @@ impl Line {
 }
 
 impl Drawable for Line {
+    fn get_moved_around(&self) -> &MovedAround {
+        &self.moved_around
+    }
+
     // TODO figure out how to give this behavior to an object without
     // copy and pasting this method everywhere
     fn camera_move(&mut self, movement: &Movement) {

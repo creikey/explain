@@ -31,34 +31,143 @@ impl Movement {
             pan: V2::new(0.0, 0.0),
         }
     }
+    fn apply_to_transform(&self, other: &mut ZoomTransform) {
+        other.scale *= self.zoom;
+        other.offset = self.zoom * (other.offset - self.wrt_point.coords) + self.wrt_point.coords;
+        other.offset -= self.pan;
+    }
 }
 
-pub struct MovedAround {
+struct ZoomTransform {
     scale: f32,
     offset: V2,
 }
 
-impl MovedAround {
-    fn new() -> Self {
+impl ZoomTransform {
+    fn new(scale: f32, offset: V2) -> Self {
+        Self { scale, offset }
+    }
+    fn does_nothing() -> Self {
         Self {
             scale: 1.0,
             offset: V2::new(0.0, 0.0),
         }
     }
+    fn transform_other(&self, other: &mut Self) {
+        other.scale *= self.scale;
+        other.offset = self.offset + other.offset * self.scale;
+    }
+}
+
+pub struct MovedAround {
+    transforms: Vec<ZoomTransform>, // vec of (scale, offset)s
+}
+
+impl MovedAround {
+    fn new() -> Self {
+        Self {
+            transforms: vec![ZoomTransform::does_nothing()],
+        }
+    }
+    fn t(&mut self) -> &mut ZoomTransform {
+        let len = self.transforms.len();
+        &mut self.transforms[len - 1]
+    }
+    /// Returns true if the offset and scale need to be applied
     fn camera_move(&mut self, movement: &Movement) {
         // TODO figure out a way to clamp these numbers from getting too big while still keeping information about the
         // scale of the object
         // TODO disable scaling by the camera while the line is being created
-        self.scale *= movement.zoom;
-        self.offset = movement.zoom*(self.offset - movement.wrt_point.coords) + movement.wrt_point.coords;
-        self.offset -= movement.pan;
+        movement.apply_to_transform(self.t());
+
+        let too_small_threshold = 0.01;
+        let too_large_threshold = 100.0;
+
+        let root_transform_too_small = self.transforms[0].scale < too_small_threshold;
+        let root_transform_too_large = self.transforms[0].scale > too_large_threshold;
+
+        if root_transform_too_small {
+            if self.t().scale < too_small_threshold {
+                self.transforms.push(ZoomTransform::does_nothing());
+            }
+            if self.t().scale > too_large_threshold {
+                let last_transform = self.transforms.pop().unwrap();
+                last_transform.transform_other(self.t());
+            }
+        }
+        if root_transform_too_large {
+            if self.t().scale > too_large_threshold {
+                self.transforms.push(ZoomTransform::does_nothing());
+            }
+            if self.t().scale < too_small_threshold {
+                let last_transform = self.transforms.pop().unwrap();
+                last_transform.transform_other(self.t());
+            }
+        }
+
+        println!();
+        print!("[");
+        for t in self.transforms.iter().rev().take(4).rev() {
+            print!("{}, ", t.offset.x);
+        }
+        println!("]");
+
+        print!("[");
+        for t in self.transforms.iter().rev().take(4).rev() {
+            print!("{}, ", t.scale);
+        }
+        println!("]");
+        /*for t in self.transforms.iter() {
+            println!("{}", t.0);
+            // println!("{}", t.1);
+        }*/
+    }
+    fn get_drawing_transform(&self) -> ZoomTransform {
+        let mut transform_to_return = ZoomTransform::does_nothing();
+        for t in self.transforms.iter() {
+            t.transform_other(&mut transform_to_return);
+        }
+        transform_to_return
     }
     /// Writes to the `offset` and `scale` uniforms of the shader. Intended to be
     /// processed in the vertex shader like:
     /// `vec2 newPosition = scale*Position + offset;`
     fn write_to_shader(&self, program: &gl_shaders::ShaderProgram) {
-        program.write_vec2("offset", &self.offset);
-        program.write_float("scale", self.scale);
+        let transform_to_write = self.get_drawing_transform();
+        println!(
+            "{} | {}",
+            transform_to_write.scale, transform_to_write.offset.x
+        );
+        program.write_vec2("offset", &transform_to_write.offset);
+        program.write_float("scale", transform_to_write.scale);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn zoom_movement_does_not_explode() {
+        let iters = 20;
+
+        let mut movement = Movement::new();
+        let mut moved_around = MovedAround::new();
+        let mut moved_around_before = MovedAround::new();
+        movement.zoom = 0.1;
+        movement.wrt_point = P2::new(105.0, 73.0);
+        for i in 0..iters {
+            if i == 19 {
+                println!("almost");
+            }
+            moved_around.camera_move(&movement);
+        }
+        movement.zoom = 10.0;
+        movement.wrt_point = P2::new(105.0, 73.0);
+        for i in 0..iters {
+            moved_around.camera_move(&movement);
+        }
+        assert_eq!(moved_around.t().offset.x, moved_around_before.t().offset.x);
+        // assert_eq!(moved_around.t().scale, moved_around_before.t().scale);
     }
 }
 
@@ -66,6 +175,7 @@ pub trait Drawable {
     fn camera_move(&mut self, m: &Movement);
     fn draw(&self, projection: &na::Matrix4<f32>);
     fn process_event(&mut self, e: &Event) -> bool;
+    fn get_moved_around(&self) -> &MovedAround;
 }
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
@@ -213,9 +323,30 @@ pub fn main() {
 
                     // zooming
                     Event::MouseWheel { y, .. } => {
-                        let scale_delta = 1.0 + (y as f32) * 0.04;
+                        let scale_delta = 1.0 + (y as f32) * 0.01;
                         cur_movement.zoom = scale_delta;
                         cur_movement.wrt_point = mouse_pos;
+                    }
+
+                    Event::KeyDown {
+                        keycode: Some(Keycode::E),
+                        ..
+                    } => {
+                        // debug e key to zoom out really far
+                        let scale_delta = 0.1;
+                        cur_movement.zoom = scale_delta;
+                        cur_movement.wrt_point = P2::new(105.0, 73.0);
+                        // cur_movement.wrt_point = mouse_pos;
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Q),
+                        ..
+                    } => {
+                        // debug q key to zoom in really far to first object
+                        let scale_delta = 10.0;
+                        cur_movement.zoom = scale_delta;
+                        cur_movement.wrt_point = P2::new(105.0, 73.0);
+                        // P2::from(items[0].get_moved_around().get_drawing_transform().offset);
                     }
 
                     // panning
@@ -257,7 +388,7 @@ pub fn main() {
 
         let mat = projection.as_matrix();
         if let Some(item) = &mut item_currently_creating {
-            item.camera_move(&cur_movement);
+            item.camera_move(&cur_movement); // TODO don't move the camera if don't need to (no panning/zooming)
             item.draw(mat);
         }
         for i in items.iter_mut() {
