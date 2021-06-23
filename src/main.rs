@@ -33,7 +33,7 @@ impl Movement {
     }
     fn apply_to_transform(&self, other: &mut ZoomTransform) {
         other.scale *= self.zoom;
-        other.offset = self.zoom * (other.offset - self.wrt_point.coords) + self.wrt_point.coords;
+        other.offset = self.zoom * other.offset + self.wrt_point.coords*(-self.zoom + 1.0);
         other.offset -= self.pan;
     }
 }
@@ -55,7 +55,8 @@ impl ZoomTransform {
     }
     fn transform_other(&self, other: &mut Self) {
         other.scale *= self.scale;
-        other.offset = self.offset + other.offset * self.scale;
+        other.offset *= self.scale;
+        other.offset += self.offset;
     }
 }
 
@@ -80,8 +81,8 @@ impl MovedAround {
         // TODO disable scaling by the camera while the line is being created
         movement.apply_to_transform(self.t());
 
-        let too_small_threshold = 0.01;
-        let too_large_threshold = 100.0;
+        let too_small_threshold = 0.15;
+        let too_large_threshold = 8.0;
 
         let root_transform_too_small = self.transforms[0].scale < too_small_threshold;
         let root_transform_too_large = self.transforms[0].scale > too_large_threshold;
@@ -148,21 +149,20 @@ mod tests {
     use super::*;
     #[test]
     fn zoom_movement_does_not_explode() {
-        let iters = 20;
+        let iters = 10;
 
         let mut movement = Movement::new();
         let mut moved_around = MovedAround::new();
         let mut moved_around_before = MovedAround::new();
-        movement.zoom = 0.1;
-        movement.wrt_point = P2::new(105.0, 73.0);
+        movement.zoom = 0.95;
+        movement.wrt_point = P2::new(102.0, 73.0);
+        // movement.pan = V2::new(23.0, 12.0);
         for i in 0..iters {
-            if i == 19 {
-                println!("almost");
-            }
             moved_around.camera_move(&movement);
         }
-        movement.zoom = 10.0;
-        movement.wrt_point = P2::new(105.0, 73.0);
+        // movement.pan *= -1.0;
+
+        movement.zoom = 1.05;
         for i in 0..iters {
             moved_around.camera_move(&movement);
         }
@@ -323,7 +323,7 @@ pub fn main() {
 
                     // zooming
                     Event::MouseWheel { y, .. } => {
-                        let scale_delta = 1.0 + (y as f32) * 0.01;
+                        let scale_delta = 1.0 + (y as f32) * 0.05;
                         cur_movement.zoom = scale_delta;
                         cur_movement.wrt_point = mouse_pos;
                     }
