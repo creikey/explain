@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{Drawable, Movement, MovedAround};
+use crate::{Drawable, Movement, ZoomTransform};
 use na::Point3;
 use sdl2::event::Event;
 use serde_json::{from_str, Map, Value};
@@ -16,7 +16,7 @@ pub struct Text {
     gl_vertices: VertexData<(P2, P2)>,
     texture: gl::types::GLuint,
     character_map: Map<String, Value>,
-    moved_around: MovedAround,
+    zoom_transform: ZoomTransform,
     size: (u64, u64),
     origin: P2,
     width_offset: f32,
@@ -85,7 +85,7 @@ impl Text {
             size,
             character_map,
             origin,
-            moved_around: MovedAround::new(),
+            zoom_transform: ZoomTransform::does_nothing(),
             width_offset: 0.0,
             text: String::from("A"),
         }
@@ -93,19 +93,23 @@ impl Text {
 }
 
 impl Drawable for Text {
-    fn get_moved_around(&self) -> &MovedAround {
-        &self.moved_around
+    // TODO figure out how to give this behavior to an object without
+    // copy and pasting this method everywhere
+    fn set_transform(&mut self, z: ZoomTransform) {
+        self.zoom_transform = z;
     }
-    fn camera_move(&mut self, movement: &Movement) {
-        self.moved_around.camera_move(movement);
-    }
-    fn draw(&self, projection: &na::Matrix4<f32>) {
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &ZoomTransform) {
         self.shader_program.set_used();
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.texture);
         }
+
+        let mut transform_to_use = ZoomTransform::does_nothing();
+        self.zoom_transform.transform_other(&mut transform_to_use);
+        camera.transform_other(&mut transform_to_use);
+
         self.shader_program.write_mat4("projection", projection);
-        self.moved_around.write_to_shader(&self.shader_program);
+        transform_to_use.write_to_shader(&self.shader_program);
         self.gl_vertices.draw();
     }
 

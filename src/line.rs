@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{Drawable, MovedAround, Movement};
+use crate::{Drawable, Movement, ZoomTransform};
 use na::Vector2;
 use sdl2::event::Event;
 
@@ -12,7 +12,7 @@ pub struct Line {
     shader_program: ShaderProgram,
     gl_vertices: VertexData<(P2, V2)>,
     last_point: Option<P2>,
-    moved_around: MovedAround,
+    zoom_transform: ZoomTransform,
 }
 
 impl Line {
@@ -23,29 +23,29 @@ impl Line {
         Line {
             last_point: None,
             shader_program,
-            moved_around: MovedAround::new(),
+            zoom_transform: ZoomTransform::does_nothing(),
             gl_vertices: VertexData::new(vec![POINT2_F32, VECTOR2_F32]),
         }
     }
 }
 
 impl Drawable for Line {
-    fn get_moved_around(&self) -> &MovedAround {
-        &self.moved_around
-    }
-
     // TODO figure out how to give this behavior to an object without
     // copy and pasting this method everywhere
-    fn camera_move(&mut self, movement: &Movement) {
-        self.moved_around.camera_move(movement);
+    fn set_transform(&mut self, z: ZoomTransform) {
+        self.zoom_transform = z;
     }
-    fn draw(&self, projection: &na::Matrix4<f32>) {
+    fn draw(&self, projection: &na::Matrix4<f32>, camera: &ZoomTransform) {
         if self.gl_vertices.data_len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
+        let mut transform_to_use = ZoomTransform::does_nothing();
+        self.zoom_transform.transform_other(&mut transform_to_use);
+        camera.transform_other(&mut transform_to_use);
+
         self.shader_program.set_used();
         self.shader_program.write_mat4("projection", projection);
-        self.moved_around.write_to_shader(&self.shader_program);
+        transform_to_use.write_to_shader(&self.shader_program);
         self.shader_program.write_float("width", 2.0);
         self.gl_vertices.draw();
     }
