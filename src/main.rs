@@ -1,16 +1,22 @@
+extern crate directories;
 extern crate gl;
 extern crate nalgebra as na;
 extern crate sdl2;
-
+extern crate serde;
 #[macro_use]
 pub mod gl_shaders;
 pub mod gl_vertices;
 mod line;
 mod text;
 
+use line::Line;
+use text::Text;
+
+use directories::{BaseDirs, ProjectDirs, UserDirs};
 use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
 use sdl2::{event::Event, mouse};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 // TODO put all these type aliases into util mod
@@ -39,8 +45,9 @@ impl Movement {
         other.offset -= self.pan;
     }
 }
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ZoomTransform {
     scale: f64,
     offset: V2f64,
@@ -119,8 +126,147 @@ extern "system" fn message_callback(
     }
 }
 
+fn fatal_msgbox(window: &sdl2::video::Window, msg: &str) {
+    use sdl2::messagebox::{show_simple_message_box, MessageBoxFlag};
+    show_simple_message_box(MessageBoxFlag::ERROR, "Fatal Error", msg, window).unwrap();
+    panic!();
+}
+
+fn expect_msgbox<T: std::fmt::Debug, E: std::fmt::Debug>(
+    window: &sdl2::video::Window,
+    r: Result<T, E>,
+    msg: &str,
+) -> T {
+    if r.is_ok() {
+        r.unwrap()
+    } else {
+        fatal_msgbox(window, format!("{} - {:?}", msg, r.unwrap_err()).as_str());
+        panic!();
+    }
+}
+
+fn get_save_directory_path() -> PathBuf {
+    // TODO msgbox the unwrap
+    PathBuf::from(
+        ProjectDirs::from("com", "creikey", "Explain")
+            .unwrap()
+            .data_dir(),
+    )
+}
+
+fn get_save_file_path() -> PathBuf {
+    get_save_directory_path().join("save.explain")
+}
+
+fn save(window: &sdl2::video::Window, world: &World) {
+    let save_directory = get_save_directory_path();
+    expect_msgbox(
+        &window,
+        std::fs::create_dir_all(&save_directory),
+        format!(
+            "failed to create save directory in {}",
+            save_directory.to_str().unwrap()
+        )
+        .as_str(),
+    );
+    use std::fs::File;
+    use std::io::prelude::*;
+    let saved_world = SavedWorld::from_world(world);
+    let encoded = bincode::serialize(&saved_world).unwrap();
+    let save_file_path = get_save_file_path();
+    println!(
+        "{} | {}",
+        save_directory.to_str().unwrap(),
+        save_file_path.to_str().unwrap()
+    );
+
+    use std::fs::OpenOptions;
+    let mut save_file = if save_file_path.exists() {
+        OpenOptions::new().write(true).open(save_file_path).unwrap()
+    } else {
+        File::create(save_file_path).unwrap()
+    };
+    save_file.write_all(encoded.as_slice()).unwrap();
+}
+
+fn load_or_new_world() -> World {
+    let save_path = get_save_file_path();
+    let to_return: World;
+    if save_path.exists() {
+        let bytes = std::fs::read(save_path).unwrap();
+        let saved_world: SavedWorld = bincode::deserialize(bytes.as_slice()).unwrap();
+        to_return = saved_world.into_world();
+    } else {
+        to_return = World::new();
+    }
+
+    to_return
+}
+
+struct World {
+    camera: ZoomTransform,
+    lines: Vec<line::Line>,
+    texts: Vec<text::Text>,
+}
+
+impl World {
+    fn new() -> World {
+        World {
+            camera: ZoomTransform::does_nothing(),
+            lines: vec![],
+            texts: vec![],
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct SavedWorld {
+    camera: ZoomTransform,
+    lines: Vec<line::SavedLine>,
+    texts: Vec<text::SavedText>,
+}
+
+impl SavedWorld {
+    fn from_world(w: &World) -> Self {
+        // TODO with_capacity
+        let mut lines: Vec<line::SavedLine> = Vec::new();
+        let mut texts: Vec<text::SavedText> = Vec::new();
+
+        for l in w.lines.iter() {
+            lines.push(line::SavedLine::from_line(l));
+        }
+        for t in w.texts.iter() {
+            texts.push(text::SavedText::from_text(t));
+        }
+
+        Self {
+            lines,
+            texts,
+            camera: w.camera.clone(),
+        }
+    }
+    fn into_world(&self) -> World {
+        let mut lines: Vec<line::Line> = Vec::new();
+        let mut texts: Vec<text::Text> = Vec::new();
+
+        for l in self.lines.iter() {
+            lines.push(l.into_line());
+        }
+        for t in self.texts.iter() {
+            texts.push(t.into_text());
+        }
+
+        World {
+            lines,
+            texts,
+            camera: self.camera.clone(),
+        }
+    }
+}
+
 pub fn main() {
     let sdl_context = sdl2::init().unwrap();
+
     let video_subsystem = sdl_context.video().unwrap();
 
     let gl_attr = video_subsystem.gl_attr();
@@ -145,15 +291,15 @@ pub fn main() {
     // ui state
     // array of items that dynamically expands as user creates more items with the various tools
     // available
-    let mut items: Vec<Box<dyn Drawable>> = Vec::new();
-    let mut item_currently_creating: Option<Box<dyn Drawable>> = None;
+    let mut world = load_or_new_world();
+    let mut currently_creating_line: Option<Line> = None;
+    let mut currently_creating_text: Option<Text> = None;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
     // gl stuff
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
     let mut drawing_wireframe = false;
-    let mut camera = ZoomTransform::does_nothing();
     unsafe {
         gl::Viewport(0, 0, 800, 600);
         gl::Enable(gl::DEBUG_OUTPUT);
@@ -171,30 +317,53 @@ pub fn main() {
         let middle_down = ms.middle();
         let mouse_pos = P2::new(ms.x() as f32, ms.y() as f32);
         drop(ms);
-        // commits the item if it's there, if it's not does nothing.
-        fn commit_item(
-            items: &mut Vec<Box<dyn Drawable>>,
-            item_currently_creating: Option<Box<dyn Drawable>>,
-        ) -> Option<Box<dyn Drawable>> {
-            if item_currently_creating.is_some() {
-                items.push(item_currently_creating.unwrap());
-                None
-            } else {
-                item_currently_creating
-            }
-        }
 
         let mut cur_movement = Movement::new();
         for event in event_pump.poll_iter() {
             use sdl2::mouse::MouseButton;
-            // pass event on through trait
             let mut consumed_event = false;
-            if let Some(item) = &mut item_currently_creating {
-                let mut new_transform = camera.clone();
+            if let Some(line) = &mut currently_creating_line {
+                let mut new_transform = world.camera.clone();
                 new_transform.become_inverse();
-                item.set_transform(new_transform);
-                consumed_event = item.process_event(&event);
+                line.set_transform(new_transform);
+                consumed_event = line.process_event(&event);
             }
+            if let Some(text) = &mut currently_creating_text {
+                let mut new_transform = world.camera.clone();
+                new_transform.become_inverse();
+                text.set_transform(new_transform);
+                consumed_event = text.process_event(&event);
+            }
+
+            fn push_line_if_there(
+                window: &sdl2::video::Window,
+                world: &mut World,
+                line: Option<Line>,
+            ) -> Option<Line> {
+                match line {
+                    Some(o) => {
+                        world.lines.push(o);
+                        save(&window, &world);
+                        None
+                    }
+                    None => line,
+                }
+            }
+            fn push_text_if_there(
+                window: &sdl2::video::Window,
+                world: &mut World,
+                text: Option<Text>,
+            ) -> Option<Text> {
+                match text {
+                    Some(o) => {
+                        world.texts.push(o);
+                        save(&window, &world);
+                        None
+                    }
+                    None => text,
+                }
+            }
+
             if !consumed_event {
                 match event {
                     // TODO refactor thing creation to put whether element is created or not into element's file
@@ -209,14 +378,16 @@ pub fn main() {
                         mouse_btn: MouseButton::Left,
                         ..
                     } => {
-                        item_currently_creating = commit_item(&mut items, item_currently_creating);
-                        item_currently_creating = Some(Box::new(line::Line::new()));
+                        currently_creating_line =
+                            push_line_if_there(&window, &mut world, currently_creating_line);
+                        currently_creating_line = Some(Line::new());
                     }
                     Event::MouseButtonUp {
                         mouse_btn: MouseButton::Left,
                         ..
                     } => {
-                        item_currently_creating = commit_item(&mut items, item_currently_creating);
+                        currently_creating_line =
+                            push_line_if_there(&window, &mut world, currently_creating_line);
                     }
 
                     // text
@@ -224,20 +395,20 @@ pub fn main() {
                         keycode: Some(Keycode::T),
                         ..
                     } => {
-                        item_currently_creating = commit_item(&mut items, item_currently_creating);
+                        currently_creating_text =
+                            push_text_if_there(&window, &mut world, currently_creating_text);
                         let global_pos = mouse_pos;
-                        item_currently_creating = Some(Box::new(text::Text::new(P2::new(
-                            global_pos.x,
-                            global_pos.y,
-                        ))));
+                        currently_creating_text =
+                            Some(Text::new(P2::new(global_pos.x, global_pos.y)));
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::Return),
                         ..
                     } => {
-                        item_currently_creating = commit_item(&mut items, item_currently_creating);
+                        currently_creating_text =
+                            push_text_if_there(&window, &mut world, currently_creating_text);
                     }
-                    
+
                     // zooming
                     Event::MouseWheel { y, .. } => {
                         let scale_delta = 1.0 + (y as f64) * 0.05;
@@ -304,12 +475,18 @@ pub fn main() {
         }
 
         let mat = projection.as_matrix();
-        cur_movement.apply_to_transform(&mut camera);
-        if let Some(item) = &mut item_currently_creating {
-            item.draw(mat, &camera);
+        cur_movement.apply_to_transform(&mut world.camera);
+        if let Some(line) = &mut currently_creating_line {
+            line.draw(mat, &world.camera);
         }
-        for i in items.iter_mut() {
-            i.draw(mat, &camera);
+        if let Some(text) = &mut currently_creating_text {
+            text.draw(mat, &world.camera);
+        }
+        for t in world.texts.iter_mut() {
+            t.draw(mat, &world.camera);
+        }
+        for l in world.lines.iter_mut() {
+            l.draw(mat, &world.camera);
         }
 
         window.gl_swap_window();

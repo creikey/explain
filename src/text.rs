@@ -11,6 +11,35 @@ extern crate image;
 type P2 = na::Point2<f32>;
 type V2 = na::Vector2<f32>;
 
+use serde::{Deserialize, Serialize};
+#[derive(Serialize, Deserialize)]
+pub struct SavedText {
+    text: String,
+    transform: ZoomTransform,
+    origin: P2,
+}
+
+impl SavedText {
+    pub fn from_text(t: &Text) -> Self {
+        Self {
+            transform: t.zoom_transform.clone(),
+            text: t.text.clone(),
+            origin: t.origin.clone(),
+        }
+    }
+
+    pub fn into_text(&self) -> Text {
+        let mut to_return = Text::new(self.origin);
+        to_return.zoom_transform = self.transform.clone();
+
+        for c in self.text.chars() {
+            to_return.add_character(&c.to_string());
+        }
+
+        to_return
+    }
+}
+
 pub struct Text {
     shader_program: ShaderProgram,
     gl_vertices: VertexData<(P2, P2)>,
@@ -87,8 +116,67 @@ impl Text {
             origin,
             zoom_transform: ZoomTransform::does_nothing(),
             width_offset: 0.0,
-            text: String::from("A"),
+            text: String::from(""),
         }
+    }
+    fn add_character(&mut self, key_string: &String) {
+        let character_to_rect = self
+            .character_map
+            .get("characters")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let rect = character_to_rect
+            .get(key_string)
+            .unwrap()
+            .as_object()
+            .unwrap();
+        self.text.push_str(key_string);
+        // TODO use strong typed version of this json stuff (should probably do this when font logic is abstracted to multiple fonts)
+        let width_in_px = rect.get("width").unwrap().as_i64().unwrap();
+        let height_in_px = rect.get("height").unwrap().as_i64().unwrap();
+        let width = width_in_px as f32 / self.size.0 as f32;
+        let height = height_in_px as f32 / self.size.1 as f32;
+        let x = rect.get("x").unwrap().as_i64().unwrap() as f32 / self.size.0 as f32;
+        let y = rect.get("y").unwrap().as_i64().unwrap() as f32 / self.size.1 as f32;
+        let origin_y = rect.get("originY").unwrap().as_i64().unwrap();
+        let origin_x = -rect.get("originX").unwrap().as_i64().unwrap() as f32;
+
+        let vertical_offset = self.character_map.get("size").unwrap().as_i64().unwrap() - origin_y;
+        let mut new_vertices = vec![
+            (
+                P2::new(self.width_offset + origin_x, vertical_offset as f32),
+                P2::new(x, y),
+            ), // upper left
+            (
+                P2::new(
+                    self.width_offset + origin_x + width_in_px as f32,
+                    vertical_offset as f32,
+                ),
+                P2::new(x + width, y),
+            ), // upper right
+            (
+                P2::new(
+                    self.width_offset + origin_x + width_in_px as f32,
+                    (vertical_offset + height_in_px) as f32,
+                ),
+                P2::new(x + width, y + height),
+            ), // lower right
+            (
+                P2::new(
+                    self.width_offset + origin_x,
+                    (vertical_offset + height_in_px) as f32,
+                ),
+                P2::new(x, y + height),
+            ), // lower left
+        ];
+        for p in new_vertices.iter_mut() {
+            p.0.x += self.origin.x;
+            p.0.y += self.origin.y;
+        }
+        self.gl_vertices
+            .append(&mut new_vertices, &mut vec![0, 1, 2, 0, 3, 2], false);
+        self.width_offset += rect.get("advance").unwrap().as_i64().unwrap() as f32;
     }
 }
 
@@ -124,63 +212,14 @@ impl Drawable for Text {
                 .get("characters")
                 .unwrap()
                 .as_object()
-                .unwrap(); // TODO move this to constructor
+                .unwrap();
 
             if !character_to_rect.contains_key(key_string) {
                 return false;
             }
 
-            let rect = character_to_rect
-                .get(key_string)
-                .unwrap()
-                .as_object()
-                .unwrap();
-            // TODO use strong typed version of this json stuff (should probably do this when font logic is abstracted to multiple fonts)
-            let width_in_px = rect.get("width").unwrap().as_i64().unwrap();
-            let height_in_px = rect.get("height").unwrap().as_i64().unwrap();
-            let width = width_in_px as f32 / self.size.0 as f32;
-            let height = height_in_px as f32 / self.size.1 as f32;
-            let x = rect.get("x").unwrap().as_i64().unwrap() as f32 / self.size.0 as f32;
-            let y = rect.get("y").unwrap().as_i64().unwrap() as f32 / self.size.1 as f32;
-            let origin_y = rect.get("originY").unwrap().as_i64().unwrap();
-            let origin_x = -rect.get("originX").unwrap().as_i64().unwrap() as f32;
+            self.add_character(key_string);
 
-            let vertical_offset =
-                self.character_map.get("size").unwrap().as_i64().unwrap() - origin_y;
-            let mut new_vertices = vec![
-                (
-                    P2::new(self.width_offset + origin_x, vertical_offset as f32),
-                    P2::new(x, y),
-                ), // upper left
-                (
-                    P2::new(
-                        self.width_offset + origin_x + width_in_px as f32,
-                        vertical_offset as f32,
-                    ),
-                    P2::new(x + width, y),
-                ), // upper right
-                (
-                    P2::new(
-                        self.width_offset + origin_x + width_in_px as f32,
-                        (vertical_offset + height_in_px) as f32,
-                    ),
-                    P2::new(x + width, y + height),
-                ), // lower right
-                (
-                    P2::new(
-                        self.width_offset + origin_x,
-                        (vertical_offset + height_in_px) as f32,
-                    ),
-                    P2::new(x, y + height),
-                ), // lower left
-            ];
-            for p in new_vertices.iter_mut() {
-                p.0.x += self.origin.x;
-                p.0.y += self.origin.y;
-            }
-            self.gl_vertices
-                .append(&mut new_vertices, &mut vec![0, 1, 2, 0, 3, 2], false);
-            self.width_offset += rect.get("advance").unwrap().as_i64().unwrap() as f32;
             return true;
         }
         false

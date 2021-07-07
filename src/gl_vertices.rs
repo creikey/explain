@@ -96,8 +96,11 @@ impl<T> VertexData<T> {
         }
         self.deactivate();
     }
-    pub fn data(&mut self) -> &mut Vec<T> {
+    pub fn data_mut(&mut self) -> &mut Vec<T> {
         &mut self.data
+    }
+    pub fn data(&self) -> &Vec<T> {
+        &self.data
     }
     /// Length of vertices and attributes
     pub fn data_len(&self) -> usize {
