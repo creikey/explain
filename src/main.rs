@@ -190,6 +190,7 @@ fn save(window: &sdl2::video::Window, world: &World) {
 }
 
 fn load_or_new_world() -> World {
+    // TODO this stuff should definitely expect_msgbox to show that the save file is corrupt
     let save_path = get_save_file_path();
     let to_return: World;
     if save_path.exists() {
