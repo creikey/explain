@@ -8,7 +8,9 @@ pub mod gl_shaders;
 pub mod gl_vertices;
 mod line;
 mod text;
+mod util;
 
+use util::*;
 use line::Line;
 use text::Text;
 
@@ -18,12 +20,6 @@ use sdl2::video::GLProfile;
 use sdl2::{event::Event, mouse};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
-// TODO put all these type aliases into util mod
-type P2 = na::Point2<f32>;
-type V2 = na::Vector2<f32>;
-type P2f64 = na::Point2<f64>;
-type V2f64 = na::Vector2<f64>;
 
 pub struct Movement {
     wrt_point: P2f64,

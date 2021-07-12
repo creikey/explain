@@ -2,14 +2,12 @@ extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
 use crate::{Drawable, Movement, ZoomTransform};
+use crate::util::*;
 use na::Point3;
 use sdl2::event::Event;
 use serde_json::{from_str, Map, Value};
 
 extern crate image;
-
-type P2 = na::Point2<f32>;
-type V2 = na::Vector2<f32>;
 
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]

@@ -1,12 +1,10 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
+use crate::util::*;
 use crate::{Drawable, Movement, ZoomTransform};
 use na::Vector2;
 use sdl2::event::Event;
-
-type P2 = na::Point2<f32>;
-type V2 = Vector2<f32>;
 
 pub struct Line {
     shader_program: ShaderProgram,
