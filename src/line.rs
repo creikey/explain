@@ -8,16 +8,15 @@ use sdl2::event::Event;
 type P2 = na::Point2<f32>;
 type V2 = Vector2<f32>;
 
-
 pub struct Line {
     shader_program: ShaderProgram,
 
     gl_vertices: VertexData<(P2, V2)>,
     last_point: Option<P2>,
     zoom_transform: ZoomTransform,
-} 
+}
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct SavedLine {
     points: Vec<P2>,
@@ -43,16 +42,17 @@ impl SavedLine {
         let mut to_return = Line::new();
 
         let mut i = 0;
-        while i < self.points.len() - 1 {
-            to_return.add_new_segment(self.points[i], self.points[i+1]);
-            i += 1;
+        if self.points.len() > 0 {
+            while i < self.points.len() - 1 {
+                to_return.add_new_segment(self.points[i], self.points[i + 1]);
+                i += 1;
+            }
         }
         to_return.zoom_transform = self.transform.clone();
 
         to_return
     }
 }
-
 
 impl Line {
     pub fn new() -> Line {
@@ -124,7 +124,7 @@ impl Drawable for Line {
         self.shader_program.write_float("width", 2.0);
         self.gl_vertices.draw();
     }
-    
+
     fn process_event(&mut self, e: &Event) -> bool {
         // TODO when line is committed move out of DYNAMIC_DRAW memory
 
