@@ -4,8 +4,8 @@ extern crate nalgebra as na;
 extern crate sdl2;
 extern crate serde;
 #[macro_use]
-pub mod gl_shaders;
-pub mod gl_vertices;
+mod gl_shaders;
+mod gl_vertices;
 mod line;
 mod text;
 mod util;
