@@ -1,6 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
+use crate::zooming::*;
 use crate::util::*;
 use crate::{Drawable, Movement, ZoomTransform};
 use na::Vector2;
