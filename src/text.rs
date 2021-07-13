@@ -1,7 +1,7 @@
 extern crate gl;
 use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::{ExplainObject, ZoomTransform, TypedExplainObject};
+use crate::{ExplainObject, ZoomTransform, TypedExplainObject, Shaders};
 use crate::util::*;
 use sdl2::event::Event;
 use serde_json::{from_str, Map, Value};
@@ -37,8 +37,8 @@ impl SavedText {
     }
 }
 
+#[derive(Clone)]
 pub struct Text {
-    shader_program: ShaderProgram,
     gl_vertices: VertexData<(P2, P2)>,
     texture: gl::types::GLuint,
     character_map: Map<String, Value>,
@@ -51,7 +51,6 @@ pub struct Text {
 
 impl Text {
     pub fn new(origin: P2) -> Self {
-        let shader_program = shader!("text.vert", "text.frag");
 
         use vertex_attribs::*;
         let mut gl_vertices = VertexData::new(vec![POINT2_F32, POINT2_F32]);
@@ -105,7 +104,6 @@ impl Text {
         }
 
         Text {
-            shader_program,
             texture,
             gl_vertices,
             size,
@@ -183,8 +181,8 @@ impl ExplainObject for Text {
     fn set_transform(&mut self, z: ZoomTransform) {
         self.zoom_transform = z;
     }
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &ZoomTransform) {
-        self.shader_program.set_used();
+    fn draw(&self, shaders: &Shaders, projection: &na::Matrix4<f32>, camera: &ZoomTransform) {
+        shaders.text.set_used();
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, self.texture);
         }
@@ -193,8 +191,8 @@ impl ExplainObject for Text {
         self.zoom_transform.transform_other(&mut transform_to_use);
         camera.transform_other(&mut transform_to_use);
 
-        self.shader_program.write_mat4("projection", projection);
-        transform_to_use.write_to_shader(&self.shader_program);
+        shaders.text.write_mat4("projection", projection);
+        transform_to_use.write_to_shader(&shaders.text);
         self.gl_vertices.draw();
     }
 
@@ -221,7 +219,7 @@ impl ExplainObject for Text {
         }
         false
     }
-    fn get_as_type(self) -> TypedExplainObject {
-        TypedExplainObject::text(self)
+    fn get_as_type(&self) -> TypedExplainObject {
+        TypedExplainObject::text((*self).clone())
     }
 }

@@ -5,15 +5,17 @@ use std::ffi::CString;
 
 // based off of https://github.com/Nercury/rust-and-opengl-lessons/blob/master/lesson-03/src/render_gl.rs
 
+// TODO any way to get rid of these crate calls without requiring a use::* or use{ShaderProgram, etc} in the file where it's used?
 macro_rules! shader {
     ($vert_program:literal , $frag_program:literal) => {
-        ShaderProgram::from_shaders(&[
-            Shader::from_source(include_str!($vert_program), ShaderType::Vertex).unwrap(),
-            Shader::from_source(include_str!($frag_program), ShaderType::Fragment).unwrap(),
+        crate::gl_shaders::ShaderProgram::from_shaders(&[
+            crate::gl_shaders::Shader::from_source(include_str!($vert_program), crate::gl_shaders::ShaderType::Vertex).unwrap(),
+            crate::gl_shaders::Shader::from_source(include_str!($frag_program), crate::gl_shaders::ShaderType::Fragment).unwrap(),
         ])
         .unwrap()
     };
 }
+
 pub struct ShaderProgram {
     id: gl::types::GLuint,
 }

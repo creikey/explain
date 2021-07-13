@@ -3,12 +3,12 @@ use crate::gl_shaders::*;
 use crate::gl_vertices::*;
 use crate::zooming::*;
 use crate::util::*;
-use crate::{ExplainObject, ZoomTransform, TypedExplainObject};
+use crate::{ExplainObject, ZoomTransform, TypedExplainObject, Shaders};
 use na::Vector2;
 use sdl2::event::Event;
 
+#[derive(Clone)]
 pub struct Line {
-    shader_program: ShaderProgram,
 
     gl_vertices: VertexData<(P2, V2)>,
     last_point: Option<P2>,
@@ -55,12 +55,10 @@ impl SavedLine {
 
 impl Line {
     pub fn new() -> Line {
-        let shader_program = shader!("line.vert", "line.frag");
 
         use vertex_attribs::*;
         Line {
             last_point: None,
-            shader_program,
             zoom_transform: ZoomTransform::does_nothing(),
             gl_vertices: VertexData::new(vec![POINT2_F32, VECTOR2_F32]),
         }
@@ -109,7 +107,7 @@ impl ExplainObject for Line {
     fn set_transform(&mut self, z: ZoomTransform) {
         self.zoom_transform = z;
     }
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &ZoomTransform) {
+    fn draw(&self, shaders: &Shaders, projection: &na::Matrix4<f32>, camera: &ZoomTransform) {
         if self.gl_vertices.data_len() == 0 {
             return; // nothing in the vertices array, nothing to draw
         }
@@ -117,10 +115,10 @@ impl ExplainObject for Line {
         self.zoom_transform.transform_other(&mut transform_to_use);
         camera.transform_other(&mut transform_to_use);
 
-        self.shader_program.set_used();
-        self.shader_program.write_mat4("projection", projection);
-        transform_to_use.write_to_shader(&self.shader_program);
-        self.shader_program.write_float("width", 2.0);
+        shaders.line.set_used();
+        shaders.line.write_mat4("projection", projection);
+        transform_to_use.write_to_shader(&shaders.line);
+        shaders.line.write_float("width", 2.0);
         self.gl_vertices.draw();
     }
 
@@ -143,7 +141,7 @@ impl ExplainObject for Line {
         false
     }
 
-    fn get_as_type(self) -> TypedExplainObject {
-        TypedExplainObject::line(self)
+    fn get_as_type(&self) -> TypedExplainObject {
+        TypedExplainObject::line((*self).clone())
     }
 }

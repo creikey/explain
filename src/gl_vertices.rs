@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct VertexAttrib {
     // TODO figure out a way to automatically calculate the gl_type and size of 3 components based
     // on a type parameter
@@ -25,7 +26,7 @@ pub mod vertex_attribs {
     };
 }
 
-pub struct VertexData<T> {
+pub struct VertexData<T: Clone> {
     vao: gl::types::GLuint,
     vbo: gl::types::GLuint,
     ebo: gl::types::GLuint,
@@ -35,7 +36,17 @@ pub struct VertexData<T> {
     stride: gl::types::GLsizei,
 }
 
-impl<T> VertexData<T> {
+impl<T: Clone> Clone for VertexData<T> {
+    fn clone(&self) -> Self {
+        let mut to_return = VertexData::<T>::new(self.attributes.clone());
+        to_return.data = self.data.clone();
+        to_return.indices = self.indices.clone();
+        to_return.update_on_gpu(false);
+        to_return
+    }
+}
+
+impl<T: Clone> VertexData<T> {
     /// The type T should be a single struct or a tuple of types that each vertex should have
     /// attached to it.
     ///

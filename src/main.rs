@@ -28,14 +28,20 @@ use std::time::Duration;
 /// Stuff that is on the whiteboard, panned/zoomed around
 pub trait ExplainObject {
     fn set_transform(&mut self, z: ZoomTransform);
-    fn draw(&self, projection: &na::Matrix4<f32>, camera: &ZoomTransform);
+    fn draw(&self, shaders: &Shaders, projection: &na::Matrix4<f32>, camera: &ZoomTransform);
     fn process_event(&mut self, e: &Event) -> bool;
-    fn get_as_type(self) -> TypedExplainObject;
+    fn get_as_type(&self) -> TypedExplainObject; // this will copy, don't use it all the time
 }
 
 pub enum TypedExplainObject {
     line(Line),
     text(Text),
+}
+
+// Should there be a better scheme for how shaders are stored/managed or is this good enough?
+pub struct Shaders {
+    line: gl_shaders::ShaderProgram,
+    text: gl_shaders::ShaderProgram,
 }
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
@@ -99,6 +105,10 @@ pub fn main() {
     let mut event_pump = sdl_context.event_pump().unwrap();
 
     // gl stuff
+    let shaders = Shaders {
+        line: shader!("line.vert", "line.frag"),
+        text: shader!("text.vert", "text.frag"),
+    };
     let mut projection = nalgebra::Orthographic3::new(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
     let mut drawing_wireframe = false;
     unsafe {
@@ -135,7 +145,7 @@ pub fn main() {
                 window: &sdl2::video::Window,
                 world: &mut World,
                 object: Option<Box<dyn ExplainObject>>,
-            ) -> Option<Box<dyn ExplainObject>> {
+            ) {
                 if let Some(object) = object {
                     let as_type = object.get_as_type();
                     match as_type {
@@ -146,8 +156,8 @@ pub fn main() {
                             world.texts.push(t);
                         }
                     }
+                    save(window, world);
                 }
-                None
             }
 
             if !consumed_event {
@@ -164,16 +174,15 @@ pub fn main() {
                         mouse_btn: MouseButton::Left,
                         ..
                     } => {
-                        currently_creating =
-                            push_object_if_there(&window, &mut world, currently_creating);
+                        push_object_if_there(&window, &mut world, currently_creating);
                         currently_creating = Some(Box::new(Line::new()));
                     }
                     Event::MouseButtonUp {
                         mouse_btn: MouseButton::Left,
                         ..
                     } => {
-                        currently_creating =
-                            push_object_if_there(&window, &mut world, currently_creating);
+                        push_object_if_there(&window, &mut world, currently_creating);
+                        currently_creating = None
                     }
 
                     // text
@@ -181,8 +190,7 @@ pub fn main() {
                         keycode: Some(Keycode::T),
                         ..
                     } => {
-                        currently_creating =
-                            push_object_if_there(&window, &mut world, currently_creating);
+                        push_object_if_there(&window, &mut world, currently_creating);
                         let global_pos = mouse_pos;
                         currently_creating =
                             Some(Box::new(Text::new(P2::new(global_pos.x, global_pos.y))));
@@ -191,8 +199,8 @@ pub fn main() {
                         keycode: Some(Keycode::Return),
                         ..
                     } => {
-                        currently_creating =
-                            push_object_if_there(&window, &mut world, currently_creating);
+                        push_object_if_there(&window, &mut world, currently_creating);
+                        currently_creating = None;
                     }
 
                     // zooming
@@ -263,13 +271,13 @@ pub fn main() {
         let mat = projection.as_matrix();
         cur_movement.apply_to_transform(&mut world.camera);
         if let Some(o) = &mut currently_creating {
-            o.draw(mat, &world.camera);
+            o.draw(&shaders, mat, &world.camera);
         }
         for t in world.texts.iter_mut() {
-            t.draw(mat, &world.camera);
+            t.draw(&shaders, mat, &world.camera);
         }
         for l in world.lines.iter_mut() {
-            l.draw(mat, &world.camera);
+            l.draw(&shaders, mat, &world.camera);
         }
 
         window.gl_swap_window();
