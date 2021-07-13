@@ -1,10 +1,7 @@
 extern crate gl;
-use crate::gl_shaders::*;
 use crate::gl_vertices::*;
-use crate::zooming::*;
 use crate::util::*;
 use crate::{ExplainObject, ZoomTransform, TypedExplainObject, Shaders};
-use na::Vector2;
 use sdl2::event::Event;
 
 #[derive(Clone)]
@@ -142,6 +139,6 @@ impl ExplainObject for Line {
     }
 
     fn get_as_type(&self) -> TypedExplainObject {
-        TypedExplainObject::line((*self).clone())
+        TypedExplainObject::Line((*self).clone())
     }
 }

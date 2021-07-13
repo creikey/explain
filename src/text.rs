@@ -1,5 +1,4 @@
 extern crate gl;
-use crate::gl_shaders::*;
 use crate::gl_vertices::*;
 use crate::{ExplainObject, ZoomTransform, TypedExplainObject, Shaders};
 use crate::util::*;
@@ -53,7 +52,7 @@ impl Text {
     pub fn new(origin: P2) -> Self {
 
         use vertex_attribs::*;
-        let mut gl_vertices = VertexData::new(vec![POINT2_F32, POINT2_F32]);
+        let gl_vertices = VertexData::new(vec![POINT2_F32, POINT2_F32]);
         use image::DynamicImage;
         let img = image::load_from_memory(include_bytes!("arial-font.png")).unwrap();
         let mut texture = 0;
@@ -220,6 +219,6 @@ impl ExplainObject for Text {
         false
     }
     fn get_as_type(&self) -> TypedExplainObject {
-        TypedExplainObject::text((*self).clone())
+        TypedExplainObject::Text((*self).clone())
     }
 }

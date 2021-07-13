@@ -22,7 +22,7 @@ use zooming::*;
 
 use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
-use sdl2::{event::Event, mouse};
+use sdl2::{event::Event};
 use std::time::Duration;
 
 /// Stuff that is on the whiteboard, panned/zoomed around
@@ -34,8 +34,8 @@ pub trait ExplainObject {
 }
 
 pub enum TypedExplainObject {
-    line(Line),
-    text(Text),
+    Line(Line),
+    Text(Text),
 }
 
 // Should there be a better scheme for how shaders are stored/managed or is this good enough?
@@ -46,27 +46,27 @@ pub struct Shaders {
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
 extern "system" fn message_callback(
-    source: gl::types::GLenum,
-    t: gl::types::GLenum,
-    id: gl::types::GLuint,
-    severity: gl::types::GLenum,
-    length: gl::types::GLsizei,
-    message: *const gl::types::GLchar,
-    user_param: *mut gl::types::GLvoid,
+    _source: gl::types::GLenum,
+    _t: gl::types::GLenum,
+    _id: gl::types::GLuint,
+    _severity: gl::types::GLenum,
+    _length: gl::types::GLsizei,
+    _message: *const gl::types::GLchar,
+    _user_param: *mut gl::types::GLvoid,
 ) {
     unsafe {
-        let is_error = t == gl::DEBUG_TYPE_ERROR;
+        let is_error = _t == gl::DEBUG_TYPE_ERROR;
 
         let type_name = if is_error {
             String::from("ERROR")
         } else {
-            format!("Type {}", t)
+            format!("Type {}", _t)
         };
         if is_error {
             println!(
                 "GL {}: {}",
                 type_name,
-                std::ffi::CStr::from_ptr(message).to_str().unwrap()
+                std::ffi::CStr::from_ptr(_message).to_str().unwrap()
             );
         }
     }
@@ -149,10 +149,10 @@ pub fn main() {
                 if let Some(object) = object {
                     let as_type = object.get_as_type();
                     match as_type {
-                        TypedExplainObject::line(l) => {
+                        TypedExplainObject::Line(l) => {
                             world.lines.push(l);
                         }
-                        TypedExplainObject::text(t) => {
+                        TypedExplainObject::Text(t) => {
                             world.texts.push(t);
                         }
                     }

@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
-use directories::{BaseDirs, ProjectDirs, UserDirs};
+use std::path::{PathBuf};
+use directories::{ProjectDirs};
 use crate::world::*;
 
 fn fatal_msgbox(window: &sdl2::video::Window, msg: &str) {

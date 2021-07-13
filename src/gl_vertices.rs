@@ -9,11 +9,6 @@ pub struct VertexAttrib {
 
 pub mod vertex_attribs {
     use super::*;
-    pub const POINT3_F32: VertexAttrib = VertexAttrib {
-        gl_type: gl::FLOAT,
-        size: 3 * std::mem::size_of::<f32>() as i32,
-        components: 3,
-    };
     pub const POINT2_F32: VertexAttrib = VertexAttrib {
         gl_type: gl::FLOAT,
         size: 2 * std::mem::size_of::<f32>() as i32,
@@ -107,9 +102,6 @@ impl<T: Clone> VertexData<T> {
         }
         self.deactivate();
     }
-    pub fn data_mut(&mut self) -> &mut Vec<T> {
-        &mut self.data
-    }
     pub fn data(&self) -> &Vec<T> {
         &self.data
     }
@@ -119,11 +111,6 @@ impl<T: Clone> VertexData<T> {
     }
     pub fn get_vertex(&self, index: usize) -> &T {
         &self.data[index]
-    }
-
-    pub fn set_vertex_data(&mut self, index: usize, data: T, last_update: bool) {
-        self.data[index] = data;
-        self.update_on_gpu(last_update);
     }
 
     pub fn update_on_gpu(&mut self, last_update: bool) {
