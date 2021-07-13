@@ -7,30 +7,36 @@ extern crate serde;
 mod gl_shaders;
 mod gl_vertices;
 mod line;
+mod saving;
 mod text;
 mod util;
-mod zooming;
 mod world;
-mod saving;
+mod zooming;
 
-use zooming::*;
+use line::Line;
+use saving::*;
+use text::Text;
 use util::*;
 use world::*;
-use line::Line;
-use text::Text;
-use saving::*;
+use zooming::*;
 
 use sdl2::keyboard::Keycode;
 use sdl2::video::GLProfile;
 use sdl2::{event::Event, mouse};
 use std::time::Duration;
 
-pub trait Drawable {
+/// Stuff that is on the whiteboard, panned/zoomed around
+pub trait ExplainObject {
     fn set_transform(&mut self, z: ZoomTransform);
     fn draw(&self, projection: &na::Matrix4<f32>, camera: &ZoomTransform);
     fn process_event(&mut self, e: &Event) -> bool;
+    fn get_as_type(self) -> TypedExplainObject;
 }
 
+pub enum TypedExplainObject {
+    line(Line),
+    text(Text),
+}
 
 // https://www.khronos.org/opengl/wiki/OpenGL_Error
 extern "system" fn message_callback(
@@ -88,8 +94,7 @@ pub fn main() {
     // array of items that dynamically expands as user creates more items with the various tools
     // available
     let mut world = load_or_new_world();
-    let mut currently_creating_line: Option<Line> = None;
-    let mut currently_creating_text: Option<Text> = None;
+    let mut currently_creating: Option<Box<dyn ExplainObject>> = None;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
 
@@ -118,46 +123,31 @@ pub fn main() {
         for event in event_pump.poll_iter() {
             use sdl2::mouse::MouseButton;
             let mut consumed_event = false;
-            if let Some(line) = &mut currently_creating_line {
+            if let Some(object) = &mut currently_creating {
                 let mut new_transform = world.camera.clone();
                 new_transform.become_inverse();
-                line.set_transform(new_transform);
-                consumed_event = line.process_event(&event);
-            }
-            if let Some(text) = &mut currently_creating_text {
-                let mut new_transform = world.camera.clone();
-                new_transform.become_inverse();
-                text.set_transform(new_transform);
-                consumed_event = text.process_event(&event);
+                object.set_transform(new_transform);
+                consumed_event = object.process_event(&event);
             }
 
-            fn push_line_if_there(
+            // TODO move to world
+            fn push_object_if_there(
                 window: &sdl2::video::Window,
                 world: &mut World,
-                line: Option<Line>,
-            ) -> Option<Line> {
-                match line {
-                    Some(o) => {
-                        world.lines.push(o);
-                        save(&window, &world);
-                        None
+                object: Option<Box<dyn ExplainObject>>,
+            ) -> Option<Box<dyn ExplainObject>> {
+                if let Some(object) = object {
+                    let as_type = object.get_as_type();
+                    match as_type {
+                        TypedExplainObject::line(l) => {
+                            world.lines.push(l);
+                        }
+                        TypedExplainObject::text(t) => {
+                            world.texts.push(t);
+                        }
                     }
-                    None => line,
                 }
-            }
-            fn push_text_if_there(
-                window: &sdl2::video::Window,
-                world: &mut World,
-                text: Option<Text>,
-            ) -> Option<Text> {
-                match text {
-                    Some(o) => {
-                        world.texts.push(o);
-                        save(&window, &world);
-                        None
-                    }
-                    None => text,
-                }
+                None
             }
 
             if !consumed_event {
@@ -174,16 +164,16 @@ pub fn main() {
                         mouse_btn: MouseButton::Left,
                         ..
                     } => {
-                        currently_creating_line =
-                            push_line_if_there(&window, &mut world, currently_creating_line);
-                        currently_creating_line = Some(Line::new());
+                        currently_creating =
+                            push_object_if_there(&window, &mut world, currently_creating);
+                        currently_creating = Some(Box::new(Line::new()));
                     }
                     Event::MouseButtonUp {
                         mouse_btn: MouseButton::Left,
                         ..
                     } => {
-                        currently_creating_line =
-                            push_line_if_there(&window, &mut world, currently_creating_line);
+                        currently_creating =
+                            push_object_if_there(&window, &mut world, currently_creating);
                     }
 
                     // text
@@ -191,18 +181,18 @@ pub fn main() {
                         keycode: Some(Keycode::T),
                         ..
                     } => {
-                        currently_creating_text =
-                            push_text_if_there(&window, &mut world, currently_creating_text);
+                        currently_creating =
+                            push_object_if_there(&window, &mut world, currently_creating);
                         let global_pos = mouse_pos;
-                        currently_creating_text =
-                            Some(Text::new(P2::new(global_pos.x, global_pos.y)));
+                        currently_creating =
+                            Some(Box::new(Text::new(P2::new(global_pos.x, global_pos.y))));
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::Return),
                         ..
                     } => {
-                        currently_creating_text =
-                            push_text_if_there(&window, &mut world, currently_creating_text);
+                        currently_creating =
+                            push_object_if_there(&window, &mut world, currently_creating);
                     }
 
                     // zooming
@@ -272,11 +262,8 @@ pub fn main() {
 
         let mat = projection.as_matrix();
         cur_movement.apply_to_transform(&mut world.camera);
-        if let Some(line) = &mut currently_creating_line {
-            line.draw(mat, &world.camera);
-        }
-        if let Some(text) = &mut currently_creating_text {
-            text.draw(mat, &world.camera);
+        if let Some(o) = &mut currently_creating {
+            o.draw(mat, &world.camera);
         }
         for t in world.texts.iter_mut() {
             t.draw(mat, &world.camera);

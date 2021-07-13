@@ -3,7 +3,7 @@ use crate::gl_shaders::*;
 use crate::gl_vertices::*;
 use crate::zooming::*;
 use crate::util::*;
-use crate::{Drawable, Movement, ZoomTransform};
+use crate::{ExplainObject, ZoomTransform, TypedExplainObject};
 use na::Vector2;
 use sdl2::event::Event;
 
@@ -103,7 +103,7 @@ impl Line {
     }
 }
 
-impl Drawable for Line {
+impl ExplainObject for Line {
     // TODO figure out how to give this behavior to an object without
     // copy and pasting this method everywhere
     fn set_transform(&mut self, z: ZoomTransform) {
@@ -141,5 +141,9 @@ impl Drawable for Line {
             return true;
         }
         false
+    }
+
+    fn get_as_type(self) -> TypedExplainObject {
+        TypedExplainObject::line(self)
     }
 }

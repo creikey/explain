@@ -1,10 +1,8 @@
 extern crate gl;
 use crate::gl_shaders::*;
-use crate::zooming::*;
 use crate::gl_vertices::*;
-use crate::{Drawable, Movement, ZoomTransform};
+use crate::{ExplainObject, ZoomTransform, TypedExplainObject};
 use crate::util::*;
-use na::Point3;
 use sdl2::event::Event;
 use serde_json::{from_str, Map, Value};
 
@@ -179,7 +177,7 @@ impl Text {
     }
 }
 
-impl Drawable for Text {
+impl ExplainObject for Text {
     // TODO figure out how to give this behavior to an object without
     // copy and pasting this method everywhere
     fn set_transform(&mut self, z: ZoomTransform) {
@@ -222,5 +220,8 @@ impl Drawable for Text {
             return true;
         }
         false
+    }
+    fn get_as_type(self) -> TypedExplainObject {
+        TypedExplainObject::text(self)
     }
 }
